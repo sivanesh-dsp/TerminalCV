@@ -14,7 +14,7 @@ var bannerSmall string
 // bannerFor returns an ASCII wordmark sized to the terminal width.
 func bannerFor(width int) string {
 	switch {
-	case width >= 62:
+	case width >= 74:
 		return strings.TrimRight(bannerLarge, "\n")
 	case width >= 46:
 		return strings.TrimRight(bannerSmall, "\n")
