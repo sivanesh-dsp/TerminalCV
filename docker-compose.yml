@@ -1,0 +1,68 @@
+# Portfolio: React website (Caddy, auto-HTTPS) + interactive SSH server.
+#
+#   cp .env.example .env      # then edit DOMAIN etc.
+#   docker compose up -d --build
+#
+# Web:  https://${DOMAIN}
+# SSH:  ssh sivanesh@${DOMAIN}   (host port ${SSH_PORT})
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        VITE_BASE: /
+    image: portfolio-web:latest
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  ssh:
+    build:
+      context: .
+      dockerfile: ssh/Dockerfile
+      args:
+        VERSION: ${VERSION:-1.0.0}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+    image: portfolio-ssh:latest
+    environment:
+      WEB_URL: https://${DOMAIN:-localhost}
+      RESUME_URL: https://${DOMAIN:-localhost}/Sivanesh_B_Platform_DevOps_Engineer_Resume.pdf
+      DEFAULT_USER: sivanesh
+      IDLE_TIMEOUT: 5m
+      MAX_TIMEOUT: 60m
+    ports:
+      # Host ${SSH_PORT} -> container 2222. Set SSH_PORT=22 in production
+      # (ensure the host's own sshd uses a different port).
+      - "${SSH_PORT:-2222}:2222"
+    volumes:
+      - ssh_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  caddy_data:
+  caddy_config:
+  ssh_data:

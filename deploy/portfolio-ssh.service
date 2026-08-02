@@ -1,0 +1,56 @@
+# systemd unit for running the portfolio SSH server directly on a host
+# (i.e. without Docker). Install to /etc/systemd/system/portfolio-ssh.service.
+#
+#   sudo useradd --system --home /var/lib/portfolio-ssh --shell /usr/sbin/nologin portfolio
+#   sudo mkdir -p /opt/portfolio-ssh && sudo cp portfolio-ssh /opt/portfolio-ssh/
+#   sudo cp shared/resume.json /opt/portfolio-ssh/resume.json
+#   sudo systemctl daemon-reload && sudo systemctl enable --now portfolio-ssh
+#
+# Listening on :22 requires CAP_NET_BIND_SERVICE (granted below).
+
+[Unit]
+Description=Portfolio SSH server (interactive résumé)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=portfolio
+Group=portfolio
+
+Environment=SSH_ADDR=:22
+Environment=HEALTH_ADDR=127.0.0.1:8081
+Environment=RESUME_PATH=/opt/portfolio-ssh/resume.json
+Environment=HOST_KEY_PATH=/var/lib/portfolio-ssh/host_ed25519
+Environment=STATE_PATH=/var/lib/portfolio-ssh/state.json
+Environment=WEB_URL=https://mydomain.dev
+Environment=RESUME_URL=https://mydomain.dev/Sivanesh_B_Platform_DevOps_Engineer_Resume.pdf
+
+ExecStart=/opt/portfolio-ssh/portfolio-ssh
+Restart=on-failure
+RestartSec=2s
+TimeoutStopSec=25s
+
+# Persistent state (host key, visitor stats) lives in /var/lib/portfolio-ssh.
+StateDirectory=portfolio-ssh
+
+# --- hardening / sandboxing -------------------------------------------------
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target

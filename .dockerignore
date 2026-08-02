@@ -1,0 +1,14 @@
+# Keep Docker build contexts small and reproducible.
+**/node_modules
+**/.git
+**/.github
+dist
+.npm-cache
+ssh/.go
+ssh/portfolio-ssh
+ssh/data
+**/*.log
+.DS_Store
+docs
+*.md
+!shared/**

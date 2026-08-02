@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1
+
+# ---- build the React site ----------------------------------------------------
+FROM node:20-alpine AS build
+WORKDIR /app
+
+# Install deps against the lockfile first (better layer caching).
+COPY package.json package-lock.json .npmrc ./
+RUN npm ci
+
+# Build. VITE_BASE stays "/" for a domain root (Vercel/Caddy); override for
+# GitHub-Pages-style sub-paths.
+COPY . .
+ARG VITE_BASE=/
+RUN VITE_BASE=${VITE_BASE} npm run build
+
+# ---- serve with Caddy (automatic HTTPS) --------------------------------------
+FROM caddy:2-alpine
+COPY deploy/Caddyfile /etc/caddy/Caddyfile
+COPY --from=build /app/dist /srv
+EXPOSE 80 443
+# Caddy is the default entrypoint of the base image.

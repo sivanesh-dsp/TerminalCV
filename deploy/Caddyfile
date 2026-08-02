@@ -1,0 +1,27 @@
+# Caddyfile — serves the static React site with automatic HTTPS.
+# DOMAIN defaults to localhost (Caddy issues a local certificate); set it to
+# your real domain in production to get a Let's Encrypt certificate.
+
+{$DOMAIN:localhost} {
+	root * /srv
+	encode zstd gzip
+
+	# SPA-style fallback: unknown paths serve index.html; real files (incl. the
+	# résumé PDF) are served directly.
+	try_files {path} /index.html
+	file_server
+
+	# Long-cache the content-hashed assets, short-cache everything else.
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+	header {
+		Cache-Control "public, max-age=3600"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
