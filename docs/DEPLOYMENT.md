@@ -9,6 +9,79 @@ Both read the single `shared/resume.json`, so updating the résumé updates both
 
 ---
 
+## Web on Vercel + SSH on its own host (the split you have)
+
+**Vercel can't run the SSH server** — it only serves HTTP, so it can't listen on
+raw TCP port 22. Keep the website on Vercel and run the tiny Go SSH server on any
+box with a public IP. Two easy options:
+
+### A) Cheap VPS (~$4–6/mo: Hetzner, DigitalOcean, Vultr, or Oracle free tier)
+
+On a fresh Ubuntu 22.04+ server:
+
+```bash
+# 1. Install Docker
+curl -fsSL https://get.docker.com | sh
+
+# 2. Get the code
+git clone <this-repo> && cd terminal-resume
+
+# 3. Free port 22 for the portfolio — move your ADMIN sshd first or you'll lock out!
+sudo sed -i 's/^#\?Port 22/Port 2200/' /etc/ssh/sshd_config && sudo systemctl restart ssh
+#    from now on administer the box via:  ssh -p 2200 you@server
+
+# 4. Run ONLY the SSH server (it points back at your Vercel website)
+docker compose -f docker-compose.ssh.yml up -d --build
+
+# 5. Firewall
+sudo ufw allow 22/tcp && sudo ufw allow 2200/tcp && sudo ufw --force enable
+```
+
+Test from your laptop:
+
+```bash
+ssh sivanesh@<server-ip>
+```
+
+Don't want to move the host's sshd? Run the portfolio on another port instead —
+set `SSH_PORT=2222` before step 4, and connect with `ssh -p 2222 sivanesh@<ip>`.
+
+### B) Fly.io (no server to manage) — config in `deploy/fly.toml`
+
+Run from the repo root:
+
+```bash
+curl -L https://fly.io/install.sh | sh
+fly auth login
+fly launch --no-deploy --copy-config --config deploy/fly.toml --name <your-app>
+fly volume create ssh_data --size 1 --region bom --config deploy/fly.toml
+fly ips allocate-v4 --config deploy/fly.toml      # dedicated IPv4 (~$2/mo): required for raw TCP
+fly deploy --config deploy/fly.toml --dockerfile ssh/Dockerfile
+ssh sivanesh@<your-app>.fly.dev
+```
+
+### Give it a hostname (optional, terminal.shop-style)
+
+`*.vercel.app` **cannot** be used for SSH. To get `ssh sivanesh@cv.yourdomain.dev`:
+
+1. Own a domain (Cloudflare, Namecheap, Porkbun…).
+2. Add a DNS **A record** `cv` (or `ssh`) → your server's IP (VPS), or a
+   **CNAME** to `<your-app>.fly.dev` (Fly).
+3. Connect: `ssh sivanesh@cv.yourdomain.dev`.
+
+You can even add that domain to Vercel for the website and use a *different*
+subdomain for SSH.
+
+### Notes
+
+- Any username works (`sivanesh@`, `guest@`) — it only personalises the prompt.
+- The host key + visitor stats persist in the `ssh_data` volume/mount, so users
+  don't get "host key changed" warnings across restarts and redeploys.
+- Advertise it on the site — e.g. the `contact` output could read
+  `ssh sivanesh@cv.yourdomain.dev`.
+
+---
+
 ## 1. Prerequisites
 
 - A Linux VPS with a public IP (any provider).
