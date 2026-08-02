@@ -1,0 +1,181 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Theme system.
+ * Each theme sets RGB triplets consumed by Tailwind via rgb(var(--x) / alpha).
+ * Themes are applied by toggling a class on <html>: theme-dark|green|amber.
+ * The `.hc` class layers a high-contrast override on top of any theme.
+ */
+:root,
+.theme-dark {
+  --term-bg: 10 14 20;
+  --term-fg: 230 230 230;
+  --term-dim: 122 133 144;
+  --term-accent: 94 242 176;
+  --term-accent2: 122 162 247;
+  --term-prompt: 94 242 176;
+  --term-selection: 60 80 90;
+  --term-error: 255 107 107;
+  --term-success: 94 242 176;
+  --term-warn: 255 204 102;
+  --term-link: 125 207 255;
+}
+
+.theme-green {
+  --term-bg: 3 10 3;
+  --term-fg: 74 246 118;
+  --term-dim: 32 140 64;
+  --term-accent: 122 255 158;
+  --term-accent2: 68 214 108;
+  --term-prompt: 122 255 158;
+  --term-selection: 20 70 30;
+  --term-error: 255 96 96;
+  --term-success: 122 255 158;
+  --term-warn: 190 255 120;
+  --term-link: 120 255 200;
+}
+
+.theme-amber {
+  --term-bg: 13 10 2;
+  --term-fg: 255 183 66;
+  --term-dim: 166 116 26;
+  --term-accent: 255 209 102;
+  --term-accent2: 255 176 59;
+  --term-prompt: 255 209 102;
+  --term-selection: 80 55 10;
+  --term-error: 255 107 61;
+  --term-success: 255 209 102;
+  --term-warn: 255 224 138;
+  --term-link: 255 214 140;
+}
+
+/* High-contrast override: maximise legibility for the `hc` toggle and users
+ * who request more contrast at the OS level. */
+.hc {
+  --term-bg: 0 0 0;
+  --term-fg: 255 255 255;
+  --term-dim: 200 200 200;
+  --term-accent: 0 255 170;
+  --term-accent2: 120 200 255;
+  --term-prompt: 0 255 170;
+  --term-selection: 255 255 255;
+  --term-error: 255 120 120;
+  --term-success: 0 255 170;
+  --term-warn: 255 230 120;
+  --term-link: 140 210 255;
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --term-fg: 245 245 245;
+    --term-dim: 190 195 200;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: rgb(var(--term-bg));
+  color: rgb(var(--term-fg));
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
+}
+
+::selection {
+  background: rgb(var(--term-selection));
+  color: rgb(var(--term-fg));
+}
+
+/* Themed, slim scrollbar. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--term-dim) / 0.5) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgb(var(--term-dim) / 0.4);
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--term-dim) / 0.7);
+}
+
+/* Visible keyboard-focus ring for accessibility. */
+:focus-visible {
+  outline: 2px solid rgb(var(--term-accent));
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+a {
+  color: rgb(var(--term-link));
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+/* Respect users who prefer reduced motion: kill non-essential animation. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Subtle CRT scanline vibe — kept extremely light so it never hurts contrast. */
+.crt::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgb(0 0 0 / 0) 0px,
+    rgb(0 0 0 / 0) 2px,
+    rgb(0 0 0 / 0.12) 3px
+  );
+  mix-blend-mode: multiply;
+  opacity: 0.35;
+}
+
+/* Screen-reader-only utility. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Print: hand the browser a clean text résumé instead of the dark UI. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+    color: #000;
+  }
+}
