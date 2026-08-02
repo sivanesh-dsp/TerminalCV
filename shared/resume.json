@@ -6,11 +6,15 @@
   "summary": "Certified Kubernetes Administrator (CKA) and Platform & DevOps Engineer with hands-on experience designing, automating, and operating cloud-native platforms across Azure and AWS environments. Experienced in Kubernetes, Terraform, Jenkins, GitHub Actions, Infrastructure as Code, observability platforms, and enterprise CI/CD systems. Strong background in platform engineering, DevSecOps, automation, and improving software delivery through scalable and resilient cloud-native solutions.",
   "contact": {
     "email": "sivaneshsiva240@gmail.com",
-    "phone": "8825462473",
+    "phone": "+91 8825462473",
     "location": "Chennai, India",
     "linkedin": {
       "handle": "sivaneshb",
       "url": "https://www.linkedin.com/in/sivaneshb"
+    },
+    "github": {
+      "handle": "sivaneshb",
+      "url": "https://github.com/sivanesh-dsp"
     }
   },
   "skills": [
@@ -76,6 +80,18 @@
         "Planned and executed production infrastructure upgrades, Kubernetes node pool migrations, storage migrations, and operating system upgrades with minimal downtime.",
         "Collaborated with software engineering, QA, and infrastructure teams to troubleshoot production issues, improve CI/CD workflows, and enhance platform reliability."
       ]
+    },
+    {
+      "role": "Process Associate (Mortgage Operations)",
+      "company": "Mr.Cooper",
+      "start": "06/2022",
+      "end": "03/2023",
+      "location": "Chennai",
+      "highlights": [
+        "Reviewed and processed mortgage loan applications, ensuring compliance with company policies and regulatory requirements.",
+        "Communicated with clients, lenders, and internal teams to resolve issues and provide updates on loan status.",
+        "Maintained accurate records of loan applications and documentation in the company's database."
+      ]
     }
   ],
   "certifications": [
@@ -86,6 +102,10 @@
     {
       "name": "HashiCorp Certified: Terraform Associate (004)",
       "issuer": "HashiCorp"
+    },
+    {
+      "name": "Microsoft Certified: Azure Fundamentals",
+      "issuer": "Microsoft"
     }
   ],
   "education": [
@@ -95,6 +115,13 @@
       "location": "Chennai",
       "start": "2022",
       "end": "2024"
+    },
+    {
+      "degree": "Bachelor of Computer Application (BCA)",
+      "institution": "SRM Institute of Science and Technology, Ramapuram)",
+      "location": "Chennai",
+      "start": "2019",
+      "end": "2022"
     }
   ],
   "projects": [
@@ -127,9 +154,29 @@
   ],
   "timeline": [
     {
+      "date": "2019",
+      "title": "Began BCA",
+      "subtitle": "SRM Institute of Science and Technology, Ramapuram, Chennai"
+    },
+    {
+      "date": "2022",
+      "title": "Completed BCA",
+      "subtitle": "Bachelor of Computer Application"
+    },
+    {
+      "date": "Jun 2022",
+      "title": "Joined Mr.Cooper",
+      "subtitle": "Process Associate (Mortgage Operations)"
+    },
+    {
       "date": "2022",
       "title": "Began MCA",
       "subtitle": "S.A. Engineering College (Autonomous), Chennai"
+    },
+    {
+      "date": "Mar 2023",
+      "title": "Resigned from Mr.Cooper",
+      "subtitle": "To focus on MCA and DevOps career tansition"
     },
     {
       "date": "2024",
