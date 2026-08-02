@@ -282,9 +282,11 @@ function ContactView() {
             <Ext href={c.linkedin.url}>{c.linkedin.url}</Ext>
           </KV>
         )}
-        <KV label="github" width={11}>
-          <Warn>not listed on résumé</Warn>
-        </KV>
+        {c.github && (
+          <KV label="github" width={11}>
+            <Ext href={c.github.url}>{c.github.url}</Ext>
+          </KV>
+        )}
       </div>
       <div className="mt-2 text-term-dim">
         Tip: <Accent>email</Accent>, <Accent>linkedin</Accent> open the relevant channel.
@@ -409,15 +411,21 @@ export const infoCommands: Command[] = [
     name: 'github',
     description: 'GitHub profile',
     category: 'social',
-    run: () => (
-      <div className="text-term-warn">
-        GitHub is not listed on the résumé, so there is nothing to link here yet.
-        <div className="mt-1 text-term-dim">
-          Add it later in <Accent>src/data/resume.ts</Accent> under{' '}
-          <Accent>contact.github</Accent>.
+    run: () =>
+      resume.contact.github ? (
+        <div>
+          <Ext href={resume.contact.github.url}>{resume.contact.github.url}</Ext>{' '}
+          <Muted>(@{resume.contact.github.handle})</Muted>
         </div>
-      </div>
-    ),
+      ) : (
+        <div className="text-term-warn">
+          GitHub is not listed on the résumé, so there is nothing to link here yet.
+          <div className="mt-1 text-term-dim">
+            Add it later in <Accent>shared/resume.json</Accent> under{' '}
+            <Accent>contact.github</Accent>.
+          </div>
+        </div>
+      ),
   },
   {
     name: 'blog',

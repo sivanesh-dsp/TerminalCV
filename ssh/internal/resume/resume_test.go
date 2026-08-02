@@ -25,9 +25,12 @@ func TestLoadSharedResume(t *testing.T) {
 	if r.Contact.Email == "" {
 		t.Errorf("email empty")
 	}
-	// GitHub is intentionally absent on the résumé.
-	if r.Contact.GitHub != nil {
-		t.Errorf("GitHub should be nil (not on résumé)")
+	// GitHub is listed on the résumé.
+	if r.Contact.GitHub == nil {
+		t.Fatalf("GitHub should be present")
+	}
+	if r.Contact.GitHub.URL != "https://github.com/sivanesh-dsp" {
+		t.Errorf("GitHub URL = %q", r.Contact.GitHub.URL)
 	}
 }
 
@@ -59,8 +62,8 @@ func TestExperienceLabel(t *testing.T) {
 	if got != "2 yrs 0 mos" {
 		t.Errorf("ExperienceLabel = %q, want %q", got, "2 yrs 0 mos")
 	}
-	if r.Employers() != 1 {
-		t.Errorf("Employers = %d, want 1", r.Employers())
+	if r.Employers() != 2 {
+		t.Errorf("Employers = %d, want 2", r.Employers())
 	}
 }
 

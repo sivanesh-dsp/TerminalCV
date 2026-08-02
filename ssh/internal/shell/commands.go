@@ -202,7 +202,11 @@ func renderStats(ctx *Context) string {
 		{"Certifications", fmt.Sprintf("%d", len(r.Certifications))},
 		{"Projects", fmt.Sprintf("%d", len(r.Projects))},
 		{"Employers", fmt.Sprintf("%d", r.Employers())},
-		{"GitHub repos", st.Warn("n/a — not listed on résumé")},
+	}
+	if g := r.Contact.GitHub; g != nil {
+		rows = append(rows, [2]string{"GitHub", st.Hyperlink(g.URL, st.Link(g.URL))})
+	} else {
+		rows = append(rows, [2]string{"GitHub repos", st.Warn("n/a — not listed on résumé")})
 	}
 	var b strings.Builder
 	b.WriteString(heading(st, "stats"))
