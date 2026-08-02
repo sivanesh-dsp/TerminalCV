@@ -1,3 +1,4 @@
 .go/
 data/
-portfolio-ssh
+# Built binary at the module root only (do NOT match cmd/portfolio-ssh/).
+/portfolio-ssh
