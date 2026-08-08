@@ -1,22 +1,57 @@
-# Portfolio SSH Server
+# Portfolio SSH TUI
 
-A fully sandboxed, interactive résumé served over **real SSH**. Visitors connect
-with any SSH client and get a Linux-like shell that renders the portfolio — it
-**never** executes host OS commands, touches the filesystem, or opens the
-network from a session.
+A résumé served over **real SSH** as a full-screen **terminal UI** — inspired by
+[terminal.shop](https://terminal.shop). This is **not** a shell. On connect the
+visitor is dropped straight into an interactive portfolio application: no prompt,
+no command parser, no path to the host OS.
 
 ```
-ssh sivanesh@mydomain.dev      # any username works — it just personalises the prompt
+ssh mydomain.dev          # no username required — any username is accepted
 ```
 
-Built with [`gliderlabs/ssh`](https://github.com/gliderlabs/ssh) and a custom
-raw-mode line editor (history, arrows, Tab completion, Ctrl-shortcuts, resize).
+Built with the [Charm](https://charm.sh) stack:
+[`wish`](https://github.com/charmbracelet/wish) (SSH),
+[`bubbletea`](https://github.com/charmbracelet/bubbletea) (TUI runtime),
+[`bubbles`](https://github.com/charmbracelet/bubbles) and
+[`lipgloss`](https://github.com/charmbracelet/lipgloss) (styling).
 
 ## Shared data
 
 The server reads the **same** `shared/resume.json` that the React website
 consumes — there is no duplicated résumé content. Edit that one file and both
-frontends update. The file is loaded at runtime (`RESUME_PATH`, or auto-discovered).
+frontends update. It is loaded at runtime (`RESUME_PATH`, or auto-discovered).
+
+```
+                 shared/resume.json  (single source of truth)
+                         │
+          ┌──────────────┴──────────────┐
+          ▼                             ▼
+    React web UI                  Bubble Tea SSH TUI
+    (browser)                     (terminal)
+```
+
+## Experience
+
+On connect: a ~700 ms splash, then a menu of sections. Everything is keyboard
+driven — no commands to type.
+
+| Key            | Action                                               |
+| -------------- | ---------------------------------------------------- |
+| `↑ / ↓` `k/j`  | navigate menu · scroll a section · browse items      |
+| `Enter`        | open the highlighted menu item / search result       |
+| `← / →` `Tab`  | previous / next section (flip through the portfolio) |
+| `Esc`          | back to the menu                                     |
+| `/`            | open search (matches every section)                  |
+| `?`            | keyboard-shortcuts overlay                           |
+| `q` `Ctrl+C`   | quit / disconnect                                    |
+
+**Sections:** ABOUT · EXPERIENCE · PROJECTS · SKILLS · TECH STACK ·
+CERTIFICATIONS · EDUCATION · ACHIEVEMENTS · TIMELINE · CONTACT.
+
+EXPERIENCE and PROJECTS are pagers (browse with `↑/↓`, page counter in the
+footer). CONTACT renders **OSC 8 hyperlinks**, clickable in supporting terminals.
+The layout is responsive: it adapts from 40×15 up to large windows and reflows on
+terminal resize.
 
 ## Develop
 
@@ -27,8 +62,7 @@ cd ssh
 RESUME_PATH=../shared/resume.json go run ./cmd/portfolio-ssh
 
 # from another terminal:
-ssh -p 2222 sivanesh@localhost            # interactive
-ssh -p 2222 sivanesh@localhost about      # one-shot (exec mode)
+ssh -p 2222 localhost
 ```
 
 > Tip: pass `-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no` while
@@ -39,60 +73,51 @@ ssh -p 2222 sivanesh@localhost about      # one-shot (exec mode)
 ```bash
 cd ssh
 go vet ./...
-go test ./...        # parser, command rendering, résumé loading, autocomplete
+go test -race ./...   # résumé loader, cross-section search, TUI layout/render
 go build -o portfolio-ssh ./cmd/portfolio-ssh
 ```
 
 ## Configuration (environment variables)
 
-| Variable        | Default                       | Description                                   |
-| --------------- | ----------------------------- | --------------------------------------------- |
-| `SSH_ADDR`      | `:2222`                       | SSH listen address                            |
-| `HEALTH_ADDR`   | `:8081`                       | HTTP health endpoint (`/healthz`, `/version`) |
-| `HOST_KEY_PATH` | `data/host_ed25519`           | Persisted ed25519 host key (auto-generated)   |
-| `STATE_PATH`    | `data/state.json`             | Visitor stats + last-login store              |
-| `RESUME_PATH`   | *(auto-discovered)*           | Path to `shared/resume.json`                  |
-| `WEB_URL`       | `https://mydomain.dev`        | Website URL shown in commands                 |
-| `RESUME_URL`    | `https://mydomain.dev/...pdf` | PDF link shown by `resume` / `download`       |
-| `IDLE_TIMEOUT`  | `5m`                          | Disconnect idle sessions                      |
-| `MAX_TIMEOUT`   | `60m`                         | Hard session length cap                       |
-| `DEFAULT_USER`  | `sivanesh`                    | Prompt username when none is supplied         |
-
-## Commands
-
-`help about whoami experience projects skills education certifications
-achievements techstack timeline contact resume github linkedin blog search
-stats history clear exit pwd ls cat tree echo date` — plus hidden fun:
-`neofetch matrix coffee fortune sudo hire-me hack`.
+| Variable        | Default              | Description                                   |
+| --------------- | -------------------- | --------------------------------------------- |
+| `SSH_ADDR`      | `:2222`              | SSH listen address                            |
+| `HEALTH_ADDR`   | `:8081`              | HTTP health endpoint (`/healthz`, `/version`) |
+| `HOST_KEY_PATH` | `data/host_ed25519`  | Persisted ed25519 host key (auto-generated)   |
+| `STATE_PATH`    | `data/state.json`    | Visitor stats + last-login store              |
+| `RESUME_PATH`   | *(auto-discovered)*  | Path to `shared/resume.json`                  |
+| `IDLE_TIMEOUT`  | `5m`                 | Disconnect idle sessions                      |
+| `MAX_TIMEOUT`   | `60m`                | Hard session length cap                       |
 
 ## Security model
 
-- **Anonymous auth** via SSH `none` (no password, no key) — identifies the
-  session only. Configurable username, any value accepted.
-- **No shell escape:** only the built-in command interpreter runs; the process
-  never calls `os/exec` or a real shell.
-- **No forwarding / no SFTP:** local & reverse port-forwarding, agent
-  forwarding and subsystems are all denied (no handlers registered).
-- **No filesystem/network from a session:** commands only format in-memory data.
-- **Input sanitisation:** any echoed user input (search, echo, unknown command,
-  username) is stripped of control/escape bytes.
-- **Timeouts** (idle + max) and **panic isolation** per session; systemd unit
-  adds seccomp + namespace hardening.
+- **Anonymous auth** via SSH `none` (no password, no key). Any username is
+  accepted and used only as session metadata — it never grants authorization.
+- **Not a shell:** the only interaction is the Bubble Tea program. The server
+  never calls `os/exec`, spawns a subprocess, or evaluates user input as a
+  command.
+- **No forwarding / no SFTP:** local & reverse port-forwarding, agent forwarding
+  and subsystems are all denied (no handlers registered).
+- **PTY required:** non-interactive sessions (`ssh host somecommand`) are
+  rejected by the `activeterm` middleware — there is no exec path.
+- **No filesystem/network from a session:** the TUI only formats in-memory
+  résumé data.
+- **Timeouts** (idle + max) and **panic isolation** per session; the systemd
+  unit adds seccomp + namespace hardening.
 
 ## Architecture
 
 ```
-cmd/portfolio-ssh   entrypoint: config, host key, server, health, graceful shutdown
+cmd/portfolio-ssh   entrypoint: wish server, host key, health, graceful shutdown
 internal/
   config            env-driven configuration
-  resume            data model + runtime loader for shared/resume.json
-  ansi              truecolor styling, OSC 8 hyperlinks, width helpers
+  resume            data model + runtime loader + cross-section Search()
   session           persisted visitor stats + active-session gauge
-  shell             the sandboxed interpreter:
-    shell.go        session loop, welcome/MOTD, prompt, dispatch
-    editor.go       raw-mode line editor (history, arrows, Tab, Ctrl-keys)
-    parser.go       shell-like tokenizer (quotes + escapes)
-    registry.go     command registry
-    commands.go     all résumé/system commands + renderers
-    fun.go          neofetch, matrix, coffee, hire-me, fortune, hack
+  version           build metadata (ldflags)
+  tui               the Bubble Tea application:
+    model.go        root model, Init/Update, input handling, modes
+    view.go         frame assembly (header · body · footer), menu/search/help
+    sections.go     per-section renderers (all content from resume.json)
+    theme.go        lipgloss palette (mirrors the web theme)
+    layout.go       wrapping, OSC 8 links, width/truncate helpers
 ```

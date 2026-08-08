@@ -3,7 +3,7 @@
 One portfolio, two synchronized frontends:
 
 - **Website** — `https://mydomain.dev` (static React site, served by Caddy with automatic HTTPS)
-- **SSH** — `ssh sivanesh@mydomain.dev` (Go server, fully sandboxed)
+- **SSH** — `ssh mydomain.dev` (Go + Charm/wish TUI, fully sandboxed — no shell)
 
 Both read the single `shared/resume.json`, so updating the résumé updates both.
 
@@ -28,7 +28,7 @@ SSH uses the **same hostname** — no extra record needed.
 
 ## 3. Free up port 22 for the portfolio (recommended)
 
-Visitors expect `ssh sivanesh@mydomain.dev` (port 22). Move the host's own
+Visitors expect `ssh mydomain.dev` (port 22). Move the host's own
 administrative SSH daemon to another port first, so you don't lock yourself out:
 
 ```bash
@@ -70,7 +70,7 @@ docker compose up -d --build
 That's it. Caddy fetches a Let's Encrypt certificate automatically.
 
 - Website: `https://mydomain.dev`
-- SSH: `ssh sivanesh@mydomain.dev`
+- SSH: `ssh mydomain.dev`
 
 ### What runs
 
