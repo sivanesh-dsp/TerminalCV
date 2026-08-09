@@ -12,6 +12,7 @@ import {
   Field,
   Heading,
   KV,
+  Markup,
   Muted,
   Ok,
   Warn,
@@ -23,7 +24,9 @@ function AboutView() {
   return (
     <div>
       <Heading title="about" />
-      <div className="max-w-3xl leading-relaxed text-term-fg">{resume.summary}</div>
+      <div className="max-w-3xl leading-relaxed text-term-fg">
+        <Markup>{resume.summary}</Markup>
+      </div>
       <div className="mt-3">
         <KV label="name" width={10}>
           <Bold>{resume.name}</Bold>
@@ -59,7 +62,9 @@ function ExperienceView() {
           </div>
           <div className="mt-2 space-y-1">
             {e.highlights.map((h, j) => (
-              <Bullet key={j}>{h}</Bullet>
+              <Bullet key={j}>
+                <Markup>{h}</Markup>
+              </Bullet>
             ))}
           </div>
         </div>
@@ -79,7 +84,9 @@ function ProjectsView() {
             <div className="text-term-accent">
               ◈ <Bold>{p.name}</Bold>
             </div>
-            <div className="ml-4 max-w-3xl text-term-fg">{p.description}</div>
+            <div className="ml-4 max-w-3xl text-term-fg">
+              <Markup>{p.description}</Markup>
+            </div>
             <div className="ml-4 mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-term-dim">
               {p.tech.map((t) => (
                 <span key={t}>[{t}]</span>
@@ -197,7 +204,9 @@ function AchievementsView() {
             <span className="text-term-warn" aria-hidden="true">
               ★
             </span>
-            <span className="flex-1 text-term-fg">{a}</span>
+            <span className="flex-1 text-term-fg">
+              <Markup>{a}</Markup>
+            </span>
           </div>
         ))}
       </div>

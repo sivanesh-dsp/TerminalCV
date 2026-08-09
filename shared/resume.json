@@ -3,7 +3,7 @@
   "title": "Platform Engineer | DevOps Engineer",
   "username": "sivanesh",
   "host": "portfolio",
-  "summary": "Certified Kubernetes Administrator (CKA) and Platform & DevOps Engineer with hands-on experience designing, automating, and operating cloud-native platforms across Azure and AWS environments. Experienced in Kubernetes, Terraform, Jenkins, GitHub Actions, Infrastructure as Code, observability platforms, and enterprise CI/CD systems. Strong background in platform engineering, DevSecOps, automation, and improving software delivery through scalable and resilient cloud-native solutions.",
+  "summary": "Certified Kubernetes Administrator (**CKA**) and Platform & DevOps Engineer with hands-on experience designing, automating, and operating cloud-native platforms across Azure and AWS environments. Experienced in Kubernetes, Terraform, Jenkins, GitHub Actions, Infrastructure as Code, observability platforms, and enterprise CI/CD systems. Strong background in platform engineering, DevSecOps, automation, and improving software delivery through scalable and resilient cloud-native solutions.",
   "contact": {
     "email": "sivaneshsiva240@gmail.com",
     "phone": "+91 8825462473",
@@ -72,7 +72,7 @@
       "highlights": [
         "Designed, implemented, and maintained cloud-native infrastructure on Microsoft Azure using Azure Kubernetes Service (AKS), Terraform, and Infrastructure as Code to support enterprise software development platforms.",
         "Designed and maintained enterprise CI/CD pipelines using Jenkins and GitHub Actions, automating build, test, and deployment workflows to improve software delivery and deployment reliability.",
-        "Operated a large-scale Jenkins platform on Kubernetes, managing 100+ Jenkins master pods and 300+ Linux, Windows, and macOS build agent pods across 65+ Kubernetes worker nodes, ensuring high availability, scalability, and platform performance.",
+        "Operated a large-scale Jenkins platform on Kubernetes, **managing 100+ Jenkins master pods and 300+ Linux, Windows**, and **macOS build agent pods across 65+ Kubernetes worker nodes**, ensuring high availability, scalability, and platform performance.",
         "Automated infrastructure provisioning, configuration, and lifecycle management using Terraform and Ansible, delivering repeatable, scalable, and reliable cloud infrastructure deployments.",
         "Administered and optimized Kubernetes clusters by managing node pools, networking, storage, workload scheduling, autoscaling, and high-availability configurations.",
         "Managed artifact repositories using Nexus Repository Manager and GitHub Packages to support enterprise software delivery pipelines.",

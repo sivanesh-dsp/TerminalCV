@@ -108,7 +108,7 @@ func teaHandler(res *resume.Resume, cfg config.Config, store *session.Store) bm.
 		renderer := lipgloss.NewRenderer(s)
 		renderer.SetColorProfile(colorProfile(pty.Term))
 		renderer.SetHasDarkBackground(true)
-		m := tui.New(res, cfg, store, renderer, s, s.User(), version.Version, w, h)
+		m := tui.New(res, cfg, store, renderer, s, pty.Term, s.User(), version.Version, w, h)
 		return m, []tea.ProgramOption{tea.WithAltScreen()}
 	}
 }

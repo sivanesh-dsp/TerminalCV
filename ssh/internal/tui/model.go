@@ -60,13 +60,15 @@ type Model struct {
 	resIdx  int
 
 	out         io.Writer // session output, for direct OSC 52 clipboard writes
+	term        string    // client TERM, for tmux/screen clipboard passthrough
 	copiedLabel string    // label of the most recently copied field (for feedback)
 }
 
 // New builds a Model for a session of the given terminal size. renderer is the
 // per-session lipgloss renderer (nil → global default, used in tests); out is
-// the session writer used for direct OSC 52 clipboard writes (may be nil).
-func New(res *resume.Resume, cfg config.Config, store *session.Store, renderer *lipgloss.Renderer, out io.Writer, username, version string, width, height int) Model {
+// the session writer used for direct OSC 52 clipboard writes (may be nil); term
+// is the client's TERM (for tmux/screen clipboard passthrough).
+func New(res *resume.Resume, cfg config.Config, store *session.Store, renderer *lipgloss.Renderer, out io.Writer, term, username, version string, width, height int) Model {
 	ti := textinput.New()
 	ti.Prompt = "> "
 	ti.Placeholder = "type to search…"
@@ -78,6 +80,7 @@ func New(res *resume.Resume, cfg config.Config, store *session.Store, renderer *
 		store:    store,
 		theme:    newTheme(renderer),
 		out:      out,
+		term:     term,
 		username: username,
 		version:  version,
 		now:      time.Now(),
@@ -323,7 +326,7 @@ func (m Model) copyCurrent() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if m.out != nil {
-		io.WriteString(m.out, osc52(it.copy))
+		io.WriteString(m.out, osc52For(m.term, it.copy))
 	}
 	m.copiedLabel = it.label
 	m.refreshDetail()

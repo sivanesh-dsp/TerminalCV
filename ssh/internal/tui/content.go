@@ -122,7 +122,7 @@ func renderAbout(m *Model, w int) string {
 	var b strings.Builder
 	b.WriteString(t.title.Render(r.Name) + "\n")
 	b.WriteString(t.dim.Render(r.Title) + "\n\n")
-	b.WriteString(t.base.Render(wrap(r.Summary, w)) + "\n\n")
+	b.WriteString(markupWrap(t, r.Summary, w) + "\n\n")
 	facts := [][2]string{
 		{"Experience", r.ExperienceLabel(m.now)},
 		{"Employers", fmt.Sprintf("%d", r.Employers())},
@@ -151,12 +151,12 @@ func renderExperienceItem(m *Model, i, w int) string {
 	b.WriteString("\n")
 	b.WriteString(t.accent.Render(e.Start+" – "+e.End) + "\n\n")
 	for _, h := range e.Highlights {
-		lines := strings.Split(wrap(h, w-2), "\n")
+		lines := strings.Split(markupWrap(t, h, w-2), "\n")
 		for j, ln := range lines {
 			if j == 0 {
-				b.WriteString(t.bullet.Render("• ") + t.base.Render(ln) + "\n")
+				b.WriteString(t.bullet.Render("• ") + ln + "\n")
 			} else {
-				b.WriteString("  " + t.base.Render(ln) + "\n")
+				b.WriteString("  " + ln + "\n")
 			}
 		}
 	}
@@ -171,7 +171,7 @@ func renderProjectItem(m *Model, i, w int) string {
 	p := r.Projects[i]
 	var b strings.Builder
 	b.WriteString(t.title.Render(p.Name) + "\n\n")
-	b.WriteString(t.base.Render(wrap(p.Description, w)) + "\n")
+	b.WriteString(markupWrap(t, p.Description, w) + "\n")
 	if len(p.Tech) > 0 {
 		b.WriteString("\n" + t.dim.Render("tech  ") + t.accent.Render(strings.Join(p.Tech, "  ·  ")) + "\n")
 	}
@@ -263,12 +263,12 @@ func renderAchievements(m *Model, w int) string {
 	}
 	var b strings.Builder
 	for _, a := range r.Achievements {
-		lines := strings.Split(wrap(a, w-2), "\n")
+		lines := strings.Split(markupWrap(t, a, w-2), "\n")
 		for i, ln := range lines {
 			if i == 0 {
-				b.WriteString(t.bullet.Render("▸ ") + t.base.Render(ln) + "\n")
+				b.WriteString(t.bullet.Render("▸ ") + ln + "\n")
 			} else {
-				b.WriteString("  " + t.base.Render(ln) + "\n")
+				b.WriteString("  " + ln + "\n")
 			}
 		}
 	}
@@ -309,11 +309,14 @@ func renderContactField(m *Model, label, value string, w int) string {
 	b.WriteString(t.dim.Render(label) + "\n\n")
 	b.WriteString(t.accent2.Render(wrap(value, w)) + "\n\n")
 	if m.copiedLabel == label {
-		b.WriteString(t.accent.Render("✓ copied to clipboard"))
+		b.WriteString(t.accent.Render("✓ copied to clipboard") + "\n")
 	} else {
 		b.WriteString(t.dim.Render("press ") + t.key.Render("y") + t.dim.Render(" or ") +
-			t.key.Render("↵") + t.dim.Render(" to copy"))
+			t.key.Render("↵") + t.dim.Render(" to copy") + "\n")
 	}
+	// b.WriteString("\n" + t.dim.Render("Clipboard copy uses OSC 52 (iTerm2, Ghostty, kitty,\n"+
+	// 	"WezTerm, tmux, Windows Terminal). If your terminal doesn't\n"+
+	// 	"support it, just select the text above to copy."))
 	return b.String()
 }
 

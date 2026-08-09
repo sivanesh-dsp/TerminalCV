@@ -20,7 +20,8 @@ func (r *Resume) Search(query string) []SearchHit {
 	}
 	var hits []SearchHit
 	add := func(section, title, snippet string) {
-		hits = append(hits, SearchHit{Section: section, Title: title, Snippet: snippet})
+		clean := func(s string) string { return strings.ReplaceAll(s, "**", "") }
+		hits = append(hits, SearchHit{Section: section, Title: clean(title), Snippet: clean(snippet)})
 	}
 	match := func(s string) bool { return strings.Contains(strings.ToLower(s), q) }
 

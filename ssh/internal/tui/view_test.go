@@ -26,7 +26,7 @@ func testResume(t *testing.T) *resume.Resume {
 }
 
 func newReady(t *testing.T, w, h int) Model {
-	m := New(testResume(t), config.Config{}, nil, nil, &bytes.Buffer{}, "guest", "test", w, h)
+	m := New(testResume(t), config.Config{}, nil, nil, &bytes.Buffer{}, "xterm-256color", "guest", "test", w, h)
 	m.ready = true
 	m.mode = modeBrowse
 	return m
@@ -128,5 +128,25 @@ func TestResumeTabIsFlat(t *testing.T) {
 		if !strings.Contains(out, item) {
 			t.Errorf("resume item %q missing", item)
 		}
+	}
+}
+
+func TestMarkupWrap(t *testing.T) {
+	th := newTheme(nil)
+	out := markupWrap(th, "plain **bold words** tail", 80)
+	if strings.Contains(out, "**") {
+		t.Errorf("markupWrap should strip ** markers, got %q", out)
+	}
+	if !strings.Contains(stripANSI(out), "plain bold words tail") {
+		t.Errorf("markupWrap should preserve words, got %q", stripANSI(out))
+	}
+}
+
+func TestExperienceHighlightsRenderMarkup(t *testing.T) {
+	m := newReady(t, 110, 40)
+	nm, _ := m.handleBrowseKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	m = nm.(Model)
+	if strings.Contains(stripANSI(m.View()), "**") {
+		t.Errorf("experience detail must not show raw ** markers")
 	}
 }

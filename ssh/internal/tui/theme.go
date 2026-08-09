@@ -19,6 +19,7 @@ var (
 type theme struct {
 	base      lipgloss.Style
 	brand     lipgloss.Style
+	mark      lipgloss.Style
 	key       lipgloss.Style
 	keyDesc   lipgloss.Style
 	title     lipgloss.Style
@@ -46,6 +47,7 @@ func newTheme(r *lipgloss.Renderer) theme {
 	return theme{
 		base:      r.NewStyle().Foreground(colFg),
 		brand:     r.NewStyle().Foreground(colAccent).Bold(true),
+		mark:      r.NewStyle().Foreground(colAccent).Bold(true),
 		key:       r.NewStyle().Foreground(colAccent).Bold(true),
 		keyDesc:   r.NewStyle().Foreground(colDim),
 		title:     r.NewStyle().Foreground(colFg).Bold(true),
