@@ -6,6 +6,7 @@ const GLYPHS = 'アカサタナハマヤラワ0123456789ABCDEFｸﾂﾅﾋﾐ<>*
 /** Full-screen "digital rain" overlay. Exits on ESC, click or tap. */
 export function MatrixRain({ onExit }: { onExit: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const exitArmed = useRef<(() => boolean) | null>(null);
   const reduced = useReducedMotion();
 
   useEffect(() => {
@@ -58,17 +59,32 @@ export function MatrixRain({ onExit }: { onExit: () => void }) {
   }, [reduced]);
 
   useEffect(() => {
+    // Arm exit handlers on the next tick. Without this, the very Enter keypress
+    // that launches matrix bubbles to window *after* React has synchronously
+    // mounted this overlay, so the fresh keydown listener would catch it and
+    // exit immediately.
+    let armed = false;
+    const armTimer = setTimeout(() => {
+      armed = true;
+    }, 100);
     const onKey = (e: KeyboardEvent) => {
+      if (!armed) return;
       if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') onExit();
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    exitArmed.current = () => armed;
+    return () => {
+      clearTimeout(armTimer);
+      window.removeEventListener('keydown', onKey);
+    };
   }, [onExit]);
 
   return (
     <div
       className="fixed inset-0 z-50 bg-black"
-      onClick={onExit}
+      onClick={() => {
+        if (exitArmed.current?.()) onExit();
+      }}
       role="dialog"
       aria-label="Matrix animation. Press Escape or tap to exit."
     >

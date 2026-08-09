@@ -36,10 +36,19 @@ function CopyOutput({ targetRef }: { targetRef: React.RefObject<HTMLDivElement> 
   );
 }
 
-function HistoryBlockImpl({ block }: { block: Block }) {
+function HistoryBlockImpl({
+  block,
+  reveal = false,
+  onRevealed,
+}: {
+  block: Block;
+  reveal?: boolean;
+  onRevealed?: () => void;
+}) {
   const reduced = useReducedMotion();
   const outRef = useRef<HTMLDivElement>(null);
   const hasOutput = block.output != null;
+  const doReveal = reveal && hasOutput && !reduced;
   return (
     <motion.div
       initial={reduced ? false : { opacity: 0, y: 2 }}
@@ -53,11 +62,23 @@ function HistoryBlockImpl({ block }: { block: Block }) {
           <span className="break-all text-term-fg">{block.input}</span>
         </div>
       )}
-      {hasOutput && (
-        <div ref={outRef} className="mt-0.5">
-          {block.output}
-        </div>
-      )}
+      {hasOutput &&
+        (doReveal ? (
+          <motion.div
+            ref={outRef}
+            className="mt-0.5"
+            initial={{ clipPath: 'inset(0 0 100% 0)', opacity: 0.4 }}
+            animate={{ clipPath: 'inset(0 0 0% 0)', opacity: 1 }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
+            onAnimationComplete={() => onRevealed?.()}
+          >
+            {block.output}
+          </motion.div>
+        ) : (
+          <div ref={outRef} className="mt-0.5">
+            {block.output}
+          </div>
+        ))}
       {hasOutput && block.input !== null && <CopyOutput targetRef={outRef} />}
     </motion.div>
   );
