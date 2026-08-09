@@ -32,11 +32,7 @@ func (m Model) View() string {
 
 // splashView shows a single minimal word, like terminal.shop's "terminal".
 func (m Model) splashView() string {
-	word := m.username
-	if word == "" {
-		word = "portfolio"
-	}
-	block := m.theme.brand.Render(strings.ToLower(word))
+	block := m.theme.brand.Render(m.res.Name)
 	return lipgloss.Place(max(m.width, 1), max(m.height, 1),
 		lipgloss.Center, lipgloss.Center, block)
 }
@@ -45,8 +41,8 @@ func (m Model) splashView() string {
 func (m Model) browseView() string {
 	t := m.theme
 	masthead := joinEnds(
-		t.brand.Render(strings.ToLower(firstWord(m.res.Name))+" "+lastInitial(m.res.Name)),
-		t.dim.Render(strings.ToLower(m.res.Title)),
+		t.brand.Render(m.res.Name),
+		t.dim.Render(m.res.Title),
 		m.contentW,
 	)
 
@@ -121,10 +117,12 @@ func (m Model) leftPane() string {
 	lastGroup := ""
 	for i, it := range items {
 		if it.group != lastGroup {
-			if len(lines) > 0 {
-				lines = append(lines, "")
+			if it.group != "" {
+				if len(lines) > 0 {
+					lines = append(lines, "")
+				}
+				lines = append(lines, t.group.Render(truncate("~ "+it.group+" ~", m.leftW)))
 			}
-			lines = append(lines, t.group.Render(truncate("~ "+it.group+" ~", m.leftW)))
 			lastGroup = it.group
 		}
 		label := truncate(it.label, m.leftW-1)
@@ -161,7 +159,13 @@ func (m Model) footer() string {
 	if m.detailFocus {
 		pairs = [][2]string{{"↑/↓", "scroll"}, {"esc", "back"}, {"←/→", "tab"}, {"/", "search"}, {"q", "quit"}}
 	} else {
-		pairs = [][2]string{{"↑/↓", "browse"}, {"←/→", "tab"}, {"↵", "open"}, {"/", "search"}, {"?", "help"}, {"q", "quit"}}
+		pairs = [][2]string{{"↑/↓", "browse"}, {"←/→", "tab"}}
+		if it := m.curItem(); it != nil && it.copy != "" {
+			pairs = append(pairs, [2]string{"y", "copy"})
+		} else {
+			pairs = append(pairs, [2]string{"↵", "open"})
+		}
+		pairs = append(pairs, [2]string{"/", "search"}, [2]string{"?", "help"}, [2]string{"q", "quit"})
 	}
 	hints := renderHints(t, pairs)
 	return rule + "\n" + centerBlock(truncateANSI(hints, m.contentW), m.contentW)
@@ -292,25 +296,6 @@ func overlayBottomRight(block, label string, width int) string {
 
 func truncateANSI(s string, width int) string {
 	return lipgloss.NewStyle().MaxWidth(width).Render(s)
-}
-
-func firstWord(s string) string {
-	if i := strings.IndexByte(s, ' '); i >= 0 {
-		return s[:i]
-	}
-	return s
-}
-
-func lastInitial(s string) string {
-	fields := strings.Fields(s)
-	if len(fields) < 2 {
-		return ""
-	}
-	last := fields[len(fields)-1]
-	if last == "" {
-		return ""
-	}
-	return strings.ToLower(last[:1])
 }
 
 func max(a, b int) int {

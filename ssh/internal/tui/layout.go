@@ -1,15 +1,16 @@
 package tui
 
 import (
+	"encoding/base64"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 )
 
-// osc8 wraps label in an OSC 8 terminal hyperlink. Terminals that don't support
-// it simply render the label, so this is always safe.
-func osc8(url, label string) string {
-	return "\x1b]8;;" + url + "\x1b\\" + label + "\x1b]8;;\x1b\\"
+// osc52 returns the OSC 52 clipboard-set sequence for s. Supported by iTerm2,
+// Ghostty, kitty, WezTerm, tmux, Windows Terminal and others; ignored elsewhere.
+func osc52(s string) string {
+	return "\x1b]52;c;" + base64.StdEncoding.EncodeToString([]byte(s)) + "\x07"
 }
 
 // ruleLine returns a horizontal rule of the given width using a light box char.

@@ -5,6 +5,7 @@
 package tui
 
 import (
+	"io"
 	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -57,11 +58,15 @@ type Model struct {
 	search  textinput.Model
 	results []resume.SearchHit
 	resIdx  int
+
+	out         io.Writer // session output, for direct OSC 52 clipboard writes
+	copiedLabel string    // label of the most recently copied field (for feedback)
 }
 
 // New builds a Model for a session of the given terminal size. renderer is the
-// per-session lipgloss renderer (nil → global default, used in tests).
-func New(res *resume.Resume, cfg config.Config, store *session.Store, renderer *lipgloss.Renderer, username, version string, width, height int) Model {
+// per-session lipgloss renderer (nil → global default, used in tests); out is
+// the session writer used for direct OSC 52 clipboard writes (may be nil).
+func New(res *resume.Resume, cfg config.Config, store *session.Store, renderer *lipgloss.Renderer, out io.Writer, username, version string, width, height int) Model {
 	ti := textinput.New()
 	ti.Prompt = "> "
 	ti.Placeholder = "type to search…"
@@ -72,6 +77,7 @@ func New(res *resume.Resume, cfg config.Config, store *session.Store, renderer *
 		cfg:      cfg,
 		store:    store,
 		theme:    newTheme(renderer),
+		out:      out,
 		username: username,
 		version:  version,
 		now:      time.Now(),
@@ -232,6 +238,8 @@ func (m Model) handleBrowseKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q":
 		m.quitting = true
 		return m, tea.Quit
+	case "y":
+		return m.copyCurrent()
 	case "left", "shift+tab", "[", "h":
 		m.selectTab((m.tab - 1 + len(m.tabs)) % len(m.tabs))
 		return m, nil
@@ -239,6 +247,10 @@ func (m Model) handleBrowseKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.selectTab((m.tab + 1) % len(m.tabs))
 		return m, nil
 	case "enter":
+		// On a copyable field, Enter copies; otherwise it focuses the detail.
+		if it := m.curItem(); it != nil && it.copy != "" {
+			return m.copyCurrent()
+		}
 		m.detailFocus = true
 		return m, nil
 	case "esc":
@@ -286,6 +298,7 @@ func (m *Model) selectTab(i int) {
 	m.tab = i
 	m.sel = 0
 	m.detailFocus = false
+	m.copiedLabel = ""
 	m.refreshDetail()
 	m.vp.GotoTop()
 }
@@ -296,8 +309,25 @@ func (m *Model) moveSel(delta int) {
 		return
 	}
 	m.sel = (m.sel + delta + n) % n
+	m.copiedLabel = ""
 	m.refreshDetail()
 	m.vp.GotoTop()
+}
+
+// copyCurrent yanks the selected item's value to the clipboard via OSC 52,
+// written directly to the session (Bubble Tea's renderer would strip a
+// zero-width sequence embedded in the view), and shows a confirmation.
+func (m Model) copyCurrent() (tea.Model, tea.Cmd) {
+	it := m.curItem()
+	if it == nil || it.copy == "" {
+		return m, nil
+	}
+	if m.out != nil {
+		io.WriteString(m.out, osc52(it.copy))
+	}
+	m.copiedLabel = it.label
+	m.refreshDetail()
+	return m, nil
 }
 
 func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

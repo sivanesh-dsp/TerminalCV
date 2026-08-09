@@ -42,17 +42,21 @@ the screen (no full-screen frame). Everything is keyboard driven.
 | `↑ / ↓` `k/j`  | browse the list · scroll the detail pane             |
 | `← / →` `Tab`  | switch tab (category)                                |
 | `a e p s r c`  | jump straight to a tab                               |
-| `Enter`        | focus the detail pane (then `↑/↓` scroll)            |
+| `Enter`        | focus the detail pane (or copy, on a contact field)  |
+| `y`            | copy the selected contact field to the clipboard     |
 | `Esc`          | leave the detail pane                                |
 | `/`            | search (matches every section)                       |
 | `?`            | keyboard-shortcuts overlay                           |
 | `q` `Ctrl+C`   | quit / disconnect                                    |
 
-**Tabs:** about · experience · projects · skills · resume · contact. Experience
+**Tabs:** About · Experience · Projects · Skills · Resume · Contact. Experience
 and projects list one item per role/project; selecting one shows its detail live
-on the right. CONTACT renders **OSC 8 hyperlinks**, clickable in supporting
-terminals. The layout is responsive: bordered tabs collapse to a compact line on
-narrow terminals, and it reflows on resize (40×15 → large windows).
+on the right. **Contact** lists each field (email, GitHub, LinkedIn, …) as a
+copyable item — press `y` (or `Enter`) to copy it to your clipboard via **OSC 52**
+(supported by iTerm2, Ghostty, kitty, WezTerm, Windows Terminal, tmux …). Values
+are plain text, so they're mouse-selectable even in terminals without clipboard
+or hyperlink support. The layout is responsive: bordered tabs collapse to a
+compact line on narrow terminals, and it reflows on resize (40×15 → large).
 
 Colours come from a **per-session lipgloss renderer** whose profile is derived
 from the client's `TERM`, so each visitor is styled for their own terminal.

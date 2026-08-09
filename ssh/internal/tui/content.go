@@ -7,16 +7,17 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// itemDef is one navigable entry in the left list. group is the "~ header ~" it
-// sits under; render produces the right-pane detail for the given inner width.
+// itemDef is one navigable entry in the left list. group is the "~ Header ~" it
+// sits under ("" = no header); render produces the right-pane detail. copy, when
+// non-empty, is the value yanked to the clipboard when the item is activated.
 type itemDef struct {
 	group  string
 	label  string
+	copy   string
 	render func(m *Model, w int) string
 }
 
-// tabDef is a top-bar category. key is a single-letter accelerator (like
-// terminal.shop's "s shop"). It owns an ordered list of items.
+// tabDef is a top-bar category with a single-letter accelerator.
 type tabDef struct {
 	id    string
 	label string
@@ -25,13 +26,12 @@ type tabDef struct {
 }
 
 // buildTabs assembles the whole portfolio as tabs → items, all sourced from
-// resume.json. Experience and projects become one item each so the left list
-// works exactly like a product list with a live detail pane.
+// resume.json.
 func (m *Model) buildTabs() []tabDef {
 	r := m.res
 	tabs := []tabDef{
-		{id: "about", label: "about", key: 'a', items: []itemDef{
-			{group: "profile", label: "about", render: renderAbout},
+		{id: "about", label: "About", key: 'a', items: []itemDef{
+			{group: "Profile", label: "About", render: renderAbout},
 		}},
 	}
 
@@ -40,13 +40,13 @@ func (m *Model) buildTabs() []tabDef {
 	for i := range r.Experience {
 		i := i
 		exp = append(exp, itemDef{
-			group:  "experience",
+			group:  "Experience",
 			label:  r.Experience[i].Company,
 			render: func(m *Model, w int) string { return renderExperienceItem(m, i, w) },
 		})
 	}
 	if len(exp) > 0 {
-		tabs = append(tabs, tabDef{id: "experience", label: "experience", key: 'e', items: exp})
+		tabs = append(tabs, tabDef{id: "experience", label: "Experience", key: 'e', items: exp})
 	}
 
 	// PROJECTS — one item per project.
@@ -54,33 +54,56 @@ func (m *Model) buildTabs() []tabDef {
 	for i := range r.Projects {
 		i := i
 		proj = append(proj, itemDef{
-			group:  "projects",
+			group:  "Projects",
 			label:  shortLabel(r.Projects[i].Name, 24),
 			render: func(m *Model, w int) string { return renderProjectItem(m, i, w) },
 		})
 	}
 	if len(proj) > 0 {
-		tabs = append(tabs, tabDef{id: "projects", label: "projects", key: 'p', items: proj})
+		tabs = append(tabs, tabDef{id: "projects", label: "Projects", key: 'p', items: proj})
 	}
 
 	// SKILLS — skills + tech stack.
-	tabs = append(tabs, tabDef{id: "skills", label: "skills", key: 's', items: []itemDef{
-		{group: "toolkit", label: "skills", render: renderSkills},
-		{group: "toolkit", label: "tech stack", render: renderTechStack},
+	tabs = append(tabs, tabDef{id: "skills", label: "Skills", key: 's', items: []itemDef{
+		{group: "Toolkit", label: "Skills", render: renderSkills},
+		{group: "Toolkit", label: "Tech Stack", render: renderTechStack},
 	}})
 
-	// RESUME — credentials + highlights.
-	tabs = append(tabs, tabDef{id: "resume", label: "resume", key: 'r', items: []itemDef{
-		{group: "credentials", label: "certifications", render: renderCerts},
-		{group: "credentials", label: "education", render: renderEducation},
-		{group: "highlights", label: "achievements", render: renderAchievements},
-		{group: "highlights", label: "timeline", render: renderTimeline},
+	// RESUME — flat list, no sub-grouping (credentials/highlights merged).
+	tabs = append(tabs, tabDef{id: "resume", label: "Resume", key: 'r', items: []itemDef{
+		{label: "Certifications", render: renderCerts},
+		{label: "Education", render: renderEducation},
+		{label: "Achievements", render: renderAchievements},
+		{label: "Timeline", render: renderTimeline},
 	}})
 
-	// CONTACT.
-	tabs = append(tabs, tabDef{id: "contact", label: "contact", key: 'c', items: []itemDef{
-		{group: "connect", label: "contact", render: renderContact},
-	}})
+	// CONTACT — one item per field, each copyable to the clipboard.
+	var contact []itemDef
+	addField := func(label, value string) {
+		if value == "" {
+			return
+		}
+		contact = append(contact, itemDef{
+			group:  "Connect",
+			label:  label,
+			copy:   value,
+			render: func(m *Model, w int) string { return renderContactField(m, label, value, w) },
+		})
+	}
+	c := r.Contact
+	addField("Email", c.Email)
+	if c.GitHub != nil {
+		addField("GitHub", c.GitHub.URL)
+	}
+	if c.LinkedIn != nil {
+		addField("LinkedIn", c.LinkedIn.URL)
+	}
+	if c.Portfolio != nil {
+		addField("Portfolio", c.Portfolio.URL)
+	}
+	addField("Phone", c.Phone)
+	addField("Location", c.Location)
+	tabs = append(tabs, tabDef{id: "contact", label: "Contact", key: 'c', items: contact})
 
 	return tabs
 }
@@ -101,11 +124,11 @@ func renderAbout(m *Model, w int) string {
 	b.WriteString(t.dim.Render(r.Title) + "\n\n")
 	b.WriteString(t.base.Render(wrap(r.Summary, w)) + "\n\n")
 	facts := [][2]string{
-		{"experience", r.ExperienceLabel(m.now)},
-		{"employers", fmt.Sprintf("%d", r.Employers())},
-		{"technologies", fmt.Sprintf("%d", len(r.AllTechnologies()))},
-		{"certifications", fmt.Sprintf("%d", len(r.Certifications))},
-		{"location", r.Contact.Location},
+		{"Experience", r.ExperienceLabel(m.now)},
+		{"Employers", fmt.Sprintf("%d", r.Employers())},
+		{"Technologies", fmt.Sprintf("%d", len(r.AllTechnologies()))},
+		{"Certifications", fmt.Sprintf("%d", len(r.Certifications))},
+		{"Location", r.Contact.Location},
 	}
 	for _, f := range facts {
 		b.WriteString(t.dim.Render(padRight(f[0], 15)) + t.accent.Render(f[1]) + "\n")
@@ -277,36 +300,20 @@ func renderTimeline(m *Model, w int) string {
 	return b.String()
 }
 
-func renderContact(m *Model, w int) string {
-	t, r := m.theme, m.res
-	c := r.Contact
+// renderContactField shows one contact value prominently with a copy hint.
+// Values are plain (not OSC 8) so they render cleanly and are mouse-selectable
+// even in terminals without hyperlink support.
+func renderContactField(m *Model, label, value string, w int) string {
+	t := m.theme
 	var b strings.Builder
-	row := func(label, value, url string) {
-		disp := value
-		if url != "" {
-			disp = osc8(url, value)
-		}
-		b.WriteString(t.dim.Render(padRight(label, 11)) + t.link.Render(disp) + "\n")
+	b.WriteString(t.dim.Render(label) + "\n\n")
+	b.WriteString(t.accent2.Render(wrap(value, w)) + "\n\n")
+	if m.copiedLabel == label {
+		b.WriteString(t.accent.Render("✓ copied to clipboard"))
+	} else {
+		b.WriteString(t.dim.Render("press ") + t.key.Render("y") + t.dim.Render(" or ") +
+			t.key.Render("↵") + t.dim.Render(" to copy"))
 	}
-	if c.Email != "" {
-		row("email", c.Email, "mailto:"+c.Email)
-	}
-	if c.Phone != "" {
-		b.WriteString(t.dim.Render(padRight("phone", 11)) + t.base.Render(c.Phone) + "\n")
-	}
-	if c.GitHub != nil {
-		row("github", c.GitHub.URL, c.GitHub.URL)
-	}
-	if c.LinkedIn != nil {
-		row("linkedin", c.LinkedIn.URL, c.LinkedIn.URL)
-	}
-	if c.Portfolio != nil {
-		row("portfolio", c.Portfolio.URL, c.Portfolio.URL)
-	}
-	if c.Location != "" {
-		b.WriteString(t.dim.Render(padRight("location", 11)) + t.base.Render(c.Location) + "\n")
-	}
-	b.WriteString("\n" + t.dim.Render("Links are clickable where OSC 8 hyperlinks are supported."))
 	return b.String()
 }
 
