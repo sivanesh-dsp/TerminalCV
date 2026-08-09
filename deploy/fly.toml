@@ -1,0 +1,46 @@
+# Fly.io deployment for the portfolio SSH server (no server to manage).
+# Website stays on Vercel; this only runs the SSH endpoint.
+#
+# Run from the REPOSITORY ROOT:
+#   fly launch --no-deploy --copy-config --config deploy/fly.toml --name <your-app>
+#   fly volume create ssh_data --size 1 --region bom --config deploy/fly.toml
+#   fly ips allocate-v4 --config deploy/fly.toml     # dedicated IPv4: required for raw TCP/SSH
+#   fly deploy --config deploy/fly.toml --dockerfile ssh/Dockerfile
+#
+# Then:  ssh sivanesh@<your-app>.fly.dev
+# (Shared Fly IPv4 is HTTP-only, which is why a dedicated IPv4 is needed for ssh.)
+
+app = "sivanesh-terminal-cv"
+primary_region = "bom" # Mumbai — closest Fly region to Chennai
+
+[build]
+  dockerfile = "ssh/Dockerfile"
+
+[env]
+  SSH_ADDR = ":2222"
+  HEALTH_ADDR = ":8081"
+  HOST_KEY_PATH = "/data/host_ed25519"
+  STATE_PATH = "/data/state.json"
+  WEB_URL = "https://terminal-cv-xi.vercel.app"
+  RESUME_URL = "https://terminal-cv-xi.vercel.app/Sivanesh_B_Platform_DevOps_Engineer_Resume.pdf"
+  DEFAULT_USER = "sivanesh"
+
+# Persist host key + visitor stats.
+[[mounts]]
+  source = "ssh_data"
+  destination = "/data"
+
+# Expose SSH as a raw TCP service on port 22.
+[[services]]
+  internal_port = 2222
+  protocol = "tcp"
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[services.ports]]
+    port = 22
+
+  [[services.tcp_checks]]
+    interval = "15s"
+    timeout = "2s"

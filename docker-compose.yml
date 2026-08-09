@@ -4,7 +4,7 @@
 #   docker compose up -d --build
 #
 # Web:  https://${DOMAIN}
-# SSH:  ssh sivanesh@${DOMAIN}   (host port ${SSH_PORT})
+# SSH:  ssh ${DOMAIN}   (host port ${SSH_PORT}) — any username is accepted
 
 services:
   web:
@@ -41,9 +41,6 @@ services:
         BUILD_TIME: ${BUILD_TIME:-unknown}
     image: portfolio-ssh:latest
     environment:
-      WEB_URL: https://${DOMAIN:-localhost}
-      RESUME_URL: https://${DOMAIN:-localhost}/Sivanesh_B_Platform_DevOps_Engineer_Resume.pdf
-      DEFAULT_USER: sivanesh
       IDLE_TIMEOUT: 5m
       MAX_TIMEOUT: 60m
     ports:

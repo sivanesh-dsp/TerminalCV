@@ -25,6 +25,27 @@ export const Bold = ({ children }: { children: ReactNode }) => (
   <span className="font-bold text-term-fg">{children}</span>
 );
 
+/**
+ * Renders inline `**highlight**` markers (from resume.json) as an accented,
+ * semi-bold span. Everything else is passed through unchanged.
+ */
+export function Markup({ children }: { children: string }) {
+  const parts = children.split(/\*\*(.+?)\*\*/g);
+  return (
+    <>
+      {parts.map((part, i) =>
+        i % 2 === 1 ? (
+          <span key={i} className="font-semibold text-term-accent">
+            {part}
+          </span>
+        ) : (
+          <span key={i}>{part}</span>
+        ),
+      )}
+    </>
+  );
+}
+
 /* ---------- structural helpers ---------- */
 
 /** A row of box-drawing dashes, length derived from the label it underlines. */

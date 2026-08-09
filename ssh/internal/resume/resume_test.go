@@ -67,6 +67,36 @@ func TestExperienceLabel(t *testing.T) {
 	}
 }
 
+func TestSearch(t *testing.T) {
+	r, err := Load(sharedPath)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got := r.Search(""); got != nil {
+		t.Errorf("empty query should return nil, got %d", len(got))
+	}
+	hits := r.Search("kubernetes")
+	if len(hits) == 0 {
+		t.Fatalf("expected kubernetes hits")
+	}
+	// Kubernetes appears in multiple sections (skills, experience, projects…).
+	sections := map[string]bool{}
+	for _, h := range hits {
+		sections[h.Section] = true
+	}
+	if len(sections) < 2 {
+		t.Errorf("kubernetes should span multiple sections, got %v", sections)
+	}
+	// Case-insensitive.
+	if len(r.Search("KUBERNETES")) != len(hits) {
+		t.Errorf("search should be case-insensitive")
+	}
+	// A term that shouldn't exist.
+	if got := r.Search("cobol-mainframe-zxq"); len(got) != 0 {
+		t.Errorf("expected no hits, got %d", len(got))
+	}
+}
+
 func TestParseRejectsInvalid(t *testing.T) {
 	if _, err := Parse([]byte(`{"name":""}`)); err == nil {
 		t.Errorf("expected error for empty résumé")

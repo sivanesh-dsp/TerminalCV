@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { resume } from '@/data/resume';
 import { useTheme } from '@/hooks/useTheme';
 import { TopBar } from '@/components/TopBar';
 import { Terminal, type TerminalHandle } from '@/components/Terminal';
 import { CommandPalette } from '@/components/CommandPalette';
 import { MatrixRain } from '@/components/MatrixRain';
+import { Splash } from '@/components/Splash';
 
 const RESUME_URL = `${import.meta.env.BASE_URL}${resume.resumeFile}`;
 
@@ -13,7 +15,13 @@ export default function App() {
   const [crt, setCrt] = useState(false);
   const [matrixActive, setMatrixActive] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
   const terminalRef = useRef<TerminalHandle>(null);
+
+  const dismissSplash = useCallback(() => {
+    setShowSplash(false);
+    requestAnimationFrame(() => terminalRef.current?.focusInput());
+  }, []);
 
   const downloadResume = useCallback(() => {
     const a = document.createElement('a');
@@ -78,6 +86,10 @@ export default function App() {
       />
 
       {matrixActive && <MatrixRain onExit={exitMatrix} />}
+
+      <AnimatePresence>
+        {showSplash && <Splash key="splash" onDone={dismissSplash} />}
+      </AnimatePresence>
     </div>
   );
 }

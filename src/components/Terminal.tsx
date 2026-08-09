@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useReducedMotion } from 'framer-motion';
 import { resume } from '@/data/resume';
 import { registry } from '@/commands/registry';
 import { complete, suggest } from '@/utils/autocomplete';
@@ -42,6 +43,12 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
   const [caret, setCaret] = useState(0);
   const [focused, setFocused] = useState(true);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [revealId, setRevealId] = useState<string | null>(null);
+
+  const reduced = useReducedMotion();
+  const busy = revealId !== null;
+  const busyRef = useRef(false);
+  busyRef.current = busy;
 
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -96,12 +103,29 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
   const focusInput = useCallback(() => inputRef.current?.focus(), []);
 
   /* -------------------------------- execution -------------------------------- */
-  const appendBlock = useCallback((line: string | null, output: ReactNode) => {
-    setBlocks((prev) => [...prev, { id: `b${blockId.current++}`, input: line, output }]);
-  }, []);
+  const appendBlock = useCallback(
+    (line: string | null, output: ReactNode, reveal = false) => {
+      const id = `b${blockId.current++}`;
+      setBlocks((prev) => [...prev, { id, input: line, output }]);
+      // Hold the input until the output has finished revealing.
+      if (reveal && output != null && !reduced) setRevealId(id);
+    },
+    [reduced],
+  );
+
+  const onRevealed = useCallback(() => {
+    setRevealId(null);
+    requestAnimationFrame(() => scrollToBottom(true));
+  }, [scrollToBottom]);
+
+  // Refocus the input whenever it returns after an output reveal.
+  useEffect(() => {
+    if (!busy) inputRef.current?.focus();
+  }, [busy]);
 
   const execute = useCallback(
     (rawInput: string) => {
+      if (busyRef.current) return; // ignore while output is still revealing
       const line = rawInput;
       const trimmed = line.trim();
 
@@ -151,7 +175,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
       if (suppressAppend.current) {
         suppressAppend.current = false;
       } else {
-        appendBlock(line || '', output);
+        appendBlock(line || '', output, true);
       }
 
       setInput('');
@@ -280,28 +304,35 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
         <div role="log" aria-live="polite" aria-label="Terminal output" className="space-y-3">
           {showWelcome && <Welcome onRun={(c) => execute(c)} />}
           {blocks.map((b) => (
-            <HistoryBlock key={b.id} block={b} />
+            <HistoryBlock
+              key={b.id}
+              block={b}
+              reveal={b.id === revealId}
+              onRevealed={onRevealed}
+            />
           ))}
         </div>
 
-        <InputLine
-          value={input}
-          caret={caret}
-          focused={focused}
-          inputRef={inputRef}
-          suggestions={suggestions}
-          onChange={onChange}
-          onKeyDown={onKeyDown}
-          onCaretSync={syncCaret}
-          onSuggestionClick={(s) => {
-            setSuggestions([]);
-            execute(s);
-          }}
-        />
+        {!busy && (
+          <InputLine
+            value={input}
+            caret={caret}
+            focused={focused}
+            inputRef={inputRef}
+            suggestions={suggestions}
+            onChange={onChange}
+            onKeyDown={onKeyDown}
+            onCaretSync={syncCaret}
+            onSuggestionClick={(s) => {
+              setSuggestions([]);
+              execute(s);
+            }}
+          />
+        )}
       </div>
 
       {/* Focus tracking (kept off the input element to avoid re-render churn). */}
-      <FocusProbe inputRef={inputRef} setFocused={setFocused} />
+      <FocusProbe inputRef={inputRef} setFocused={setFocused} rebind={busy} />
     </div>
   );
 });
@@ -310,9 +341,11 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
 function FocusProbe({
   inputRef,
   setFocused,
+  rebind,
 }: {
   inputRef: React.RefObject<HTMLInputElement>;
   setFocused: (v: boolean) => void;
+  rebind: boolean;
 }) {
   useEffect(() => {
     const el = inputRef.current;
@@ -326,6 +359,8 @@ function FocusProbe({
       el.removeEventListener('focus', onFocus);
       el.removeEventListener('blur', onBlur);
     };
-  }, [inputRef, setFocused]);
+    // `rebind` toggles when the input unmounts/remounts (busy cycle), so we
+    // re-attach the listeners to the fresh element.
+  }, [inputRef, setFocused, rebind]);
   return null;
 }

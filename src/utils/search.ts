@@ -5,16 +5,19 @@ export interface SearchHit {
   text: string;
 }
 
+/** Removes inline `**highlight**` markers so they never show in search text. */
+const clean = (s: string): string => s.replace(/\*\*/g, '');
+
 /** Build a flat, searchable corpus from every résumé section. */
 function corpus(): SearchHit[] {
-  const hits: SearchHit[] = [{ section: 'summary', text: resume.summary }];
+  const hits: SearchHit[] = [{ section: 'summary', text: clean(resume.summary) }];
 
   resume.experience.forEach((e) => {
     hits.push({
       section: `experience · ${e.company}`,
       text: `${e.role} at ${e.company}, ${e.location} (${e.start}–${e.end})`,
     });
-    e.highlights.forEach((h) => hits.push({ section: `experience · ${e.company}`, text: h }));
+    e.highlights.forEach((h) => hits.push({ section: `experience · ${e.company}`, text: clean(h) }));
   });
 
   resume.skills.forEach((c) =>
@@ -24,7 +27,7 @@ function corpus(): SearchHit[] {
   resume.projects.forEach((p) =>
     hits.push({
       section: `project · ${p.name}`,
-      text: `${p.name} — ${p.description} [${p.tech.join(', ')}]`,
+      text: `${p.name} — ${clean(p.description)} [${p.tech.join(', ')}]`,
     }),
   );
 
@@ -39,7 +42,7 @@ function corpus(): SearchHit[] {
     }),
   );
 
-  resume.achievements.forEach((a) => hits.push({ section: 'achievements', text: a }));
+  resume.achievements.forEach((a) => hits.push({ section: 'achievements', text: clean(a) }));
 
   return hits;
 }

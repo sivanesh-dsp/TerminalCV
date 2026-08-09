@@ -6,7 +6,7 @@ One portfolio, **two synchronized frontends**, inspired by
 | Access                              | What you get                                            |
 | ----------------------------------- | ------------------------------------------------------- |
 | 🌐 `https://mydomain.dev`           | Interactive **React** terminal in the browser           |
-| 💻 `ssh sivanesh@mydomain.dev`      | A **real SSH** session — a genuine, sandboxed shell     |
+| 💻 `ssh mydomain.dev`               | A **real SSH** session — a full-screen, sandboxed TUI   |
 
 Both are driven by a **single source of truth** — [`shared/resume.json`](shared/resume.json).
 Edit it once and the website **and** the SSH experience update together. There is
@@ -19,22 +19,31 @@ no duplicated résumé data anywhere.
 
 ## ✨ Highlights
 
-**Shared**
-- Type commands to explore: `about`, `experience`, `projects`, `skills`,
+**Two renderers, one portfolio**
+- The **browser** is a command-driven terminal; the **SSH** side is a
+  full-screen keyboard-driven TUI. Same content, different medium.
+- Sections everywhere: `about`, `experience`, `projects`, `skills`,
   `techstack`, `certifications`, `education`, `achievements`, `timeline`,
-  `stats`, `contact`, `search`, `resume`, `help`, and more.
-- Command history, Tab autocomplete, `sudo hire-me`, `neofetch`, `matrix`,
-  `coffee`, `fortune`. Honest about missing data (no invented GitHub/blog).
+  `contact`, plus cross-section `search`. Honest about missing data
+  (no invented blog).
 
 **Website** (`src/`)
 - React 18 + TypeScript + Vite + Tailwind + Framer Motion.
 - Blinking cursor, ↑/↓ history, live suggestions, ⌘K palette, three themes +
   high-contrast, copy/download/print, animated welcome, fully accessible.
+- Command history, Tab autocomplete, `sudo hire-me`, `neofetch`, `matrix`,
+  `coffee`, `fortune`.
 
-**SSH server** (`ssh/`)
-- Go + `gliderlabs/ssh` + a custom raw-mode line editor (history, arrows, Tab,
-  Ctrl-C/L/U/K/W/A/E, terminal resize, UTF-8, ANSI truecolor, OSC 8 hyperlinks).
-- Anonymous access, MOTD, visitor stats, "Last login: Never", graceful
+**SSH TUI** (`ssh/`)
+- Go + the [Charm](https://charm.sh) stack: `wish` (SSH), `bubbletea`,
+  `bubbles`, `lipgloss`. Launches straight into the portfolio — **no shell**,
+  no prompt, no command parser.
+- A terminal.shop-style **master-detail browser**: minimal splash, a bordered
+  tab bar, a grouped list with a solid accent selection bar, and a live detail
+  pane — floating centered (not full-screen). Keyboard driven (↑↓ ←→ Enter Esc
+  `a e p s r c` `/` `?` `q`), OSC 8 hyperlinks, responsive + resize, per-session
+  colours from the client's `TERM`.
+- Anonymous access (any username, no password), visitor stats, graceful
   shutdown, health checks, structured logging — and a hard security sandbox.
 
 ---
@@ -46,9 +55,9 @@ terminal-resume/
 ├── shared/
 │   └── resume.json         ← SINGLE SOURCE OF TRUTH (both frontends read this)
 ├── src/                    ← React website (imports shared/resume.json)
-├── ssh/                    ← Go SSH server (loads shared/resume.json at runtime)
+├── ssh/                    ← Go SSH TUI (loads shared/resume.json at runtime)
 │   ├── cmd/portfolio-ssh/  ← entrypoint
-│   └── internal/           ← config, resume, ansi, session, shell (interpreter)
+│   └── internal/           ← config, resume, session, tui (Bubble Tea app)
 ├── deploy/                 ← Caddyfile, nginx.conf, systemd unit
 ├── Dockerfile.web          ← build React → serve with Caddy (auto-HTTPS)
 ├── ssh/Dockerfile          ← build Go → minimal Alpine runtime
@@ -74,19 +83,18 @@ npm run build      # type-check + production build
 npm run lint
 ```
 
-### SSH server (dev)
+### SSH TUI (dev)
 
 ```bash
 cd ssh
 RESUME_PATH=../shared/resume.json go run ./cmd/portfolio-ssh   # listens on :2222
 
-# from another terminal
-ssh -p 2222 sivanesh@localhost           # interactive
-ssh -p 2222 sivanesh@localhost about     # one-shot command
+# from another terminal — no username required
+ssh -p 2222 localhost
 ```
 
 ```bash
-cd ssh && go test ./...    # parser, commands, résumé loader, autocomplete
+cd ssh && go test -race ./...    # résumé loader, search, TUI layout/render
 ```
 
 See [`ssh/README.md`](ssh/README.md) for full SSH docs.
