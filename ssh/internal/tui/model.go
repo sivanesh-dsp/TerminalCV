@@ -1,15 +1,16 @@
-// Package tui implements the SSH portfolio as a full-screen Bubble Tea program.
-// It is a self-contained application: it never shells out, reads the filesystem
-// on behalf of the user, or exposes anything beyond the portfolio itself.
+// Package tui implements the SSH portfolio as a Bubble Tea program styled after
+// terminal.shop: a minimal splash, a centered master-detail browser (tab bar +
+// grouped list + live detail pane), and a keyed footer. It is fully sandboxed —
+// it never shells out or exposes anything beyond the portfolio.
 package tui
 
 import (
-	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/sivanesh/portfolio-ssh/internal/config"
 	"github.com/sivanesh/portfolio-ssh/internal/resume"
@@ -20,8 +21,7 @@ type mode int
 
 const (
 	modeSplash mode = iota
-	modeMenu
-	modeSection
+	modeBrowse
 	modeSearch
 	modeHelp
 )
@@ -39,17 +39,19 @@ type Model struct {
 	now      time.Time
 
 	width, height int
-	innerW, bodyH int
 	ready         bool
 	quitting      bool
 
 	mode     mode
 	prevMode mode
-	sections []section
-	active   int
-	menuIdx  int
-	selExp   int
-	selProj  int
+
+	tabs        []tabDef
+	tab         int  // active tab index
+	sel         int  // selected item index within the active tab
+	detailFocus bool // when true, ↑/↓ scroll the detail pane
+
+	// layout (recomputed on resize)
+	contentW, leftW, rightW, bodyH int
 
 	vp      viewport.Model
 	search  textinput.Model
@@ -57,8 +59,9 @@ type Model struct {
 	resIdx  int
 }
 
-// New builds a Model for a session of the given terminal size.
-func New(res *resume.Resume, cfg config.Config, store *session.Store, username, version string, width, height int) Model {
+// New builds a Model for a session of the given terminal size. renderer is the
+// per-session lipgloss renderer (nil → global default, used in tests).
+func New(res *resume.Resume, cfg config.Config, store *session.Store, renderer *lipgloss.Renderer, username, version string, width, height int) Model {
 	ti := textinput.New()
 	ti.Prompt = "> "
 	ti.Placeholder = "type to search…"
@@ -68,14 +71,14 @@ func New(res *resume.Resume, cfg config.Config, store *session.Store, username, 
 		res:      res,
 		cfg:      cfg,
 		store:    store,
-		theme:    newTheme(),
+		theme:    newTheme(renderer),
 		username: username,
 		version:  version,
 		now:      time.Now(),
 		mode:     modeSplash,
-		sections: buildSections(),
 		search:   ti,
 	}
+	m.tabs = m.buildTabs()
 	m.setSize(width, height)
 	return m
 }
@@ -92,28 +95,64 @@ func (m *Model) setSize(w, h int) {
 		h = 24
 	}
 	m.width, m.height = w, h
-	m.innerW = w - 4 // borders (2) + horizontal padding (2)
-	if m.innerW < 10 {
-		m.innerW = 10
+
+	// Centered content column (terminal.shop keeps generous margins). On narrow
+	// terminals it uses most of the width (simplified layout).
+	m.contentW = w - 8
+	if m.contentW > 90 {
+		m.contentW = 90
 	}
-	// inner height minus header, footer and two rule lines.
-	m.bodyH = h - 2 - 4
-	if m.bodyH < 1 {
-		m.bodyH = 1
+	if w < 72 {
+		m.contentW = w - 2
 	}
-	m.vp = viewport.New(m.innerW, m.bodyH)
-	m.refreshContent()
+	if m.contentW < 30 {
+		m.contentW = 30
+	}
+
+	m.leftW = 24
+	if m.contentW < 60 {
+		m.leftW = m.contentW/3 + 2
+	}
+	m.rightW = m.contentW - m.leftW - 3 // 3 = gutter
+	if m.rightW < 16 {
+		m.rightW = 16
+	}
+
+	// Body height. Keep it capped so the whole block floats in the middle of
+	// tall terminals with black margins (the terminal.shop look).
+	m.bodyH = h - 12
+	if m.bodyH < 6 {
+		m.bodyH = 6
+	}
+	if m.bodyH > 22 {
+		m.bodyH = 22
+	}
+
+	m.vp = viewport.New(m.rightW, m.bodyH)
+	m.refreshDetail()
 }
 
-// refreshContent re-renders the active section into the viewport.
-func (m *Model) refreshContent() {
-	if m.mode != modeSection || len(m.sections) == 0 {
-		return
+// curItem returns the currently selected item, or nil if none.
+func (m *Model) curItem() *itemDef {
+	if m.tab < 0 || m.tab >= len(m.tabs) {
+		return nil
 	}
-	sec := m.sections[m.active]
-	m.vp.Width = m.innerW
+	items := m.tabs[m.tab].items
+	if m.sel < 0 || m.sel >= len(items) {
+		return nil
+	}
+	return &items[m.sel]
+}
+
+// refreshDetail re-renders the selected item into the detail viewport.
+func (m *Model) refreshDetail() {
+	m.vp.Width = m.rightW
 	m.vp.Height = m.bodyH
-	m.vp.SetContent(sec.render(m, m.innerW))
+	if it := m.curItem(); it != nil {
+		m.vp.SetContent(it.render(m, m.rightW))
+	} else {
+		m.vp.SetContent("")
+	}
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -123,15 +162,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case readyMsg:
 		if m.mode == modeSplash {
-			m.mode = modeMenu
+			m.mode = modeBrowse
 			m.ready = true
 		}
 		return m, nil
 	case tea.KeyMsg:
 		return m.handleKey(msg)
 	}
-	// Forward other messages (e.g. mouse) to the viewport in section mode.
-	if m.mode == modeSection {
+	if m.mode == modeBrowse && m.detailFocus {
 		var cmd tea.Cmd
 		m.vp, cmd = m.vp.Update(msg)
 		return m, cmd
@@ -140,7 +178,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Ctrl+C always quits, in every mode.
 	if msg.Type == tea.KeyCtrlC {
 		m.quitting = true
 		return m, tea.Quit
@@ -153,9 +190,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg.String() {
-	case "q":
-		m.quitting = true
-		return m, tea.Quit
 	case "?":
 		if m.mode == modeHelp {
 			m.mode = m.prevMode
@@ -165,7 +199,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "/":
-		m.prevMode = m.mode
+		m.prevMode = modeBrowse
 		m.mode = modeSearch
 		m.search.SetValue("")
 		m.search.Focus()
@@ -174,102 +208,102 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, textinput.Blink
 	}
 
-	switch m.mode {
-	case modeMenu:
-		return m.handleMenuKey(msg)
-	case modeSection:
-		return m.handleSectionKey(msg)
-	case modeHelp:
-		if msg.Type == tea.KeyEsc {
+	if m.mode == modeHelp {
+		if msg.Type == tea.KeyEsc || msg.String() == "q" {
 			m.mode = m.prevMode
 		}
 		return m, nil
 	}
-	return m, nil
+	return m.handleBrowseKey(msg)
 }
 
-func (m Model) handleMenuKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleBrowseKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Single-letter tab accelerators (like terminal.shop's "s shop").
+	if len(msg.Runes) == 1 && !m.detailFocus {
+		for i, tb := range m.tabs {
+			if msg.Runes[0] == tb.key {
+				m.selectTab(i)
+				return m, nil
+			}
+		}
+	}
+
 	switch msg.String() {
+	case "q":
+		m.quitting = true
+		return m, tea.Quit
+	case "left", "shift+tab", "[", "h":
+		m.selectTab((m.tab - 1 + len(m.tabs)) % len(m.tabs))
+		return m, nil
+	case "right", "tab", "]", "l":
+		m.selectTab((m.tab + 1) % len(m.tabs))
+		return m, nil
+	case "enter":
+		m.detailFocus = true
+		return m, nil
+	case "esc":
+		m.detailFocus = false
+		return m, nil
 	case "up", "k":
-		if m.menuIdx > 0 {
-			m.menuIdx--
+		if m.detailFocus {
+			m.vp.LineUp(1)
+		} else {
+			m.moveSel(-1)
 		}
+		return m, nil
 	case "down", "j":
-		if m.menuIdx < len(m.sections)-1 {
-			m.menuIdx++
+		if m.detailFocus {
+			m.vp.LineDown(1)
+		} else {
+			m.moveSel(1)
 		}
+		return m, nil
+	case "pgup":
+		m.vp.HalfViewUp()
+		return m, nil
+	case "pgdown", " ":
+		m.vp.HalfViewDown()
+		return m, nil
 	case "home", "g":
-		m.menuIdx = 0
+		if m.detailFocus {
+			m.vp.GotoTop()
+		} else {
+			m.sel = 0
+			m.detailFocus = false
+			m.refreshDetail()
+		}
+		return m, nil
 	case "end", "G":
-		m.menuIdx = len(m.sections) - 1
-	case "enter", "right", "l", " ":
-		m.openSection(m.menuIdx)
+		if m.detailFocus {
+			m.vp.GotoBottom()
+		}
+		return m, nil
 	}
 	return m, nil
 }
 
-func (m Model) handleSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	sec := m.sections[m.active]
-	switch msg.String() {
-	case "esc", "backspace", "h":
-		m.mode = modeMenu
-		m.menuIdx = m.active
-		return m, nil
-	case "left", "shift+tab", "[":
-		m.openSection((m.active - 1 + len(m.sections)) % len(m.sections))
-		return m, nil
-	case "right", "tab", "]":
-		m.openSection((m.active + 1) % len(m.sections))
-		return m, nil
-	}
-	if isPager(sec.id) {
-		switch msg.String() {
-		case "up", "k":
-			m.pagerMove(-1)
-			return m, nil
-		case "down", "j":
-			m.pagerMove(1)
-			return m, nil
-		}
-	}
-	// Prose sections: delegate scrolling to the viewport.
-	var cmd tea.Cmd
-	m.vp, cmd = m.vp.Update(msg)
-	return m, cmd
-}
-
-func (m *Model) pagerMove(delta int) {
-	sec := m.sections[m.active]
-	switch sec.id {
-	case "experience":
-		n := len(m.res.Experience)
-		if n > 0 {
-			m.selExp = (m.selExp + delta + n) % n
-		}
-	case "projects":
-		n := len(m.res.Projects)
-		if n > 0 {
-			m.selProj = (m.selProj + delta + n) % n
-		}
-	}
-	m.refreshContent()
+func (m *Model) selectTab(i int) {
+	m.tab = i
+	m.sel = 0
+	m.detailFocus = false
+	m.refreshDetail()
 	m.vp.GotoTop()
 }
 
-func (m *Model) openSection(i int) {
-	m.active = i
-	m.mode = modeSection
-	m.refreshContent()
+func (m *Model) moveSel(delta int) {
+	n := len(m.tabs[m.tab].items)
+	if n == 0 {
+		return
+	}
+	m.sel = (m.sel + delta + n) % n
+	m.refreshDetail()
 	m.vp.GotoTop()
 }
 
 func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyEsc:
-		m.mode = m.prevMode
-		if m.mode == modeSearch {
-			m.mode = modeMenu
-		}
+		m.mode = modeBrowse
 		return m, nil
 	case tea.KeyUp:
 		if m.resIdx > 0 {
@@ -294,16 +328,35 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// jumpToResult opens the tab/item whose section matches the hit.
 func (m *Model) jumpToResult(hit resume.SearchHit) {
-	for i, s := range m.sections {
-		if strings.EqualFold(s.name, hit.Section) {
-			m.openSection(i)
+	m.mode = modeBrowse
+	target := sectionToTab(hit.Section)
+	for i, tb := range m.tabs {
+		if tb.id == target {
+			m.selectTab(i)
 			return
 		}
 	}
-	m.mode = modeMenu
 }
 
-// View is defined in view.go.
+// sectionToTab maps a Search hit's section label to a tab id.
+func sectionToTab(section string) string {
+	switch section {
+	case "ABOUT":
+		return "about"
+	case "EXPERIENCE":
+		return "experience"
+	case "PROJECTS":
+		return "projects"
+	case "SKILLS", "TECH STACK":
+		return "skills"
+	case "CERTIFICATIONS", "EDUCATION", "ACHIEVEMENTS", "TIMELINE":
+		return "resume"
+	case "CONTACT":
+		return "contact"
+	}
+	return "about"
+}
 
 var _ tea.Model = Model{}

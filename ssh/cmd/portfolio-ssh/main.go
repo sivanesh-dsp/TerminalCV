@@ -15,14 +15,17 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	"github.com/charmbracelet/wish/activeterm"
 	bm "github.com/charmbracelet/wish/bubbletea"
+	"github.com/muesli/termenv"
 
 	"github.com/sivanesh/portfolio-ssh/internal/config"
 	"github.com/sivanesh/portfolio-ssh/internal/resume"
@@ -97,8 +100,35 @@ func teaHandler(res *resume.Resume, cfg config.Config, store *session.Store) bm.
 	return func(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 		pty, _, _ := s.Pty()
 		w, h := pty.Window.Width, pty.Window.Height
-		m := tui.New(res, cfg, store, s.User(), version.Version, w, h)
+		// Build the renderer with a FORCED colour profile derived from the
+		// client's TERM. This binds styling to the session output while
+		// skipping termenv's interactive terminal queries (which would block
+		// on clients that don't answer) and the Ascii downgrade MakeRenderer
+		// applies when no colour-profile middleware is present.
+		renderer := lipgloss.NewRenderer(s)
+		renderer.SetColorProfile(colorProfile(pty.Term))
+		renderer.SetHasDarkBackground(true)
+		m := tui.New(res, cfg, store, renderer, s.User(), version.Version, w, h)
 		return m, []tea.ProgramOption{tea.WithAltScreen()}
+	}
+}
+
+// colorProfile picks a terminal colour profile from the client's TERM string.
+// PTY is guaranteed (activeterm), so we default to 256 colours and upgrade to
+// truecolor when advertised, downgrading only for explicitly dumb/mono terms.
+func colorProfile(term string) termenv.Profile {
+	t := strings.ToLower(term)
+	switch {
+	case t == "" || t == "dumb":
+		return termenv.Ascii
+	case strings.Contains(t, "truecolor") || strings.Contains(t, "24bit"):
+		return termenv.TrueColor
+	case strings.Contains(t, "256"):
+		return termenv.ANSI256
+	case strings.Contains(t, "color"):
+		return termenv.ANSI256
+	default:
+		return termenv.ANSI256
 	}
 }
 

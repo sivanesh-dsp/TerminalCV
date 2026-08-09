@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/sivanesh/portfolio-ssh/internal/config"
 	"github.com/sivanesh/portfolio-ssh/internal/resume"
 )
@@ -23,69 +25,65 @@ func testResume(t *testing.T) *resume.Resume {
 }
 
 func newReady(t *testing.T, w, h int) Model {
-	m := New(testResume(t), config.Config{}, nil, "guest", "test", w, h)
+	m := New(testResume(t), config.Config{}, nil, nil, "guest", "test", w, h)
 	m.ready = true
-	m.mode = modeMenu
+	m.mode = modeBrowse
 	return m
 }
 
-// TestViewDimensions checks the frame is exactly the terminal size at a range
-// of sizes and never panics.
-func TestViewDimensions(t *testing.T) {
-	sizes := [][2]int{{80, 24}, {100, 30}, {120, 40}, {60, 20}, {40, 15}}
-	for _, s := range sizes {
+// TestViewNoPanic renders at several sizes and checks the frame never exceeds
+// the terminal height and never panics.
+func TestViewNoPanic(t *testing.T) {
+	for _, s := range [][2]int{{80, 24}, {100, 30}, {120, 40}, {60, 20}, {40, 15}} {
 		m := newReady(t, s[0], s[1])
 		out := m.View()
 		lines := strings.Split(out, "\n")
-		if len(lines) != s[1] {
-			t.Errorf("%dx%d: got %d lines, want %d", s[0], s[1], len(lines), s[1])
+		if len(lines) > s[1] {
+			t.Errorf("%dx%d: %d lines exceeds height %d", s[0], s[1], len(lines), s[1])
 		}
 	}
 }
 
-func TestMenuLeftAligned(t *testing.T) {
-	m := newReady(t, 80, 24)
+func TestTabsAndSelectionRender(t *testing.T) {
+	m := newReady(t, 100, 30)
 	out := stripANSI(m.View())
-	// Every menu item name should begin at the same column (rune-based).
-	var cols []int
-	for _, name := range []string{"ABOUT", "EXPERIENCE", "PROJECTS", "SKILLS", "CONTACT"} {
-		for _, line := range strings.Split(out, "\n") {
-			if i := strings.Index(line, name); i >= 0 {
-				cols = append(cols, len([]rune(line[:i])))
-				break
-			}
+	for _, tab := range []string{"about", "experience", "projects", "skills", "resume", "contact"} {
+		if !strings.Contains(out, tab) {
+			t.Errorf("tab %q missing from tab bar", tab)
 		}
 	}
-	for i := 1; i < len(cols); i++ {
-		if cols[i] != cols[0] {
-			t.Errorf("menu items not left-aligned: columns %v", cols)
-			break
-		}
+	// The about detail should be visible by default.
+	if !strings.Contains(out, m.res.Name) {
+		t.Errorf("about detail (name) not rendered")
 	}
 }
 
-func TestSectionRendersContent(t *testing.T) {
+func TestTabAcceleratorAndDetail(t *testing.T) {
 	m := newReady(t, 100, 30)
-	m.openSection(1) // EXPERIENCE
-	out := m.View()
-	if !strings.Contains(out, "EXPERIENCE") {
-		t.Errorf("experience header missing")
+	// Jump to experience via 'e'.
+	nm, _ := m.handleBrowseKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	m2 := nm.(Model)
+	if m2.tabs[m2.tab].id != "experience" {
+		t.Fatalf("expected experience tab, got %q", m2.tabs[m2.tab].id)
 	}
-	if !strings.Contains(out, m.res.Experience[0].Company) {
-		t.Errorf("experience company missing")
+	out := stripANSI(m2.View())
+	if !strings.Contains(out, m2.res.Experience[0].Company) {
+		t.Errorf("experience detail not rendered")
 	}
-	if !strings.Contains(out, "01 / 02") {
-		t.Errorf("pager counter missing")
+	// Left list should show the company as an item.
+	if !strings.Contains(out, "~ experience ~") {
+		t.Errorf("group header missing")
 	}
 }
 
-func TestSearchModeRenders(t *testing.T) {
+func TestSearchJump(t *testing.T) {
 	m := newReady(t, 100, 30)
-	m.mode = modeSearch
-	m.search.SetValue("kubernetes")
 	m.results = m.res.Search("kubernetes")
-	out := m.View()
-	if !strings.Contains(out, "SEARCH") || !strings.Contains(out, "result") {
-		t.Errorf("search view missing results header")
+	if len(m.results) == 0 {
+		t.Fatal("expected kubernetes results")
+	}
+	m.jumpToResult(m.results[0])
+	if m.mode != modeBrowse {
+		t.Errorf("jump should return to browse mode")
 	}
 }

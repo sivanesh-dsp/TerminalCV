@@ -32,26 +32,30 @@ frontends update. It is loaded at runtime (`RESUME_PATH`, or auto-discovered).
 
 ## Experience
 
-On connect: a ~700 ms splash, then a menu of sections. Everything is keyboard
-driven — no commands to type.
+On connect: a minimal splash, then a centered **master-detail browser** styled
+after [terminal.shop](https://terminal.shop) — a tab bar, a grouped list with a
+solid accent selection bar, and a live detail pane. It floats in the middle of
+the screen (no full-screen frame). Everything is keyboard driven.
 
 | Key            | Action                                               |
 | -------------- | ---------------------------------------------------- |
-| `↑ / ↓` `k/j`  | navigate menu · scroll a section · browse items      |
-| `Enter`        | open the highlighted menu item / search result       |
-| `← / →` `Tab`  | previous / next section (flip through the portfolio) |
-| `Esc`          | back to the menu                                     |
-| `/`            | open search (matches every section)                  |
+| `↑ / ↓` `k/j`  | browse the list · scroll the detail pane             |
+| `← / →` `Tab`  | switch tab (category)                                |
+| `a e p s r c`  | jump straight to a tab                               |
+| `Enter`        | focus the detail pane (then `↑/↓` scroll)            |
+| `Esc`          | leave the detail pane                                |
+| `/`            | search (matches every section)                       |
 | `?`            | keyboard-shortcuts overlay                           |
 | `q` `Ctrl+C`   | quit / disconnect                                    |
 
-**Sections:** ABOUT · EXPERIENCE · PROJECTS · SKILLS · TECH STACK ·
-CERTIFICATIONS · EDUCATION · ACHIEVEMENTS · TIMELINE · CONTACT.
+**Tabs:** about · experience · projects · skills · resume · contact. Experience
+and projects list one item per role/project; selecting one shows its detail live
+on the right. CONTACT renders **OSC 8 hyperlinks**, clickable in supporting
+terminals. The layout is responsive: bordered tabs collapse to a compact line on
+narrow terminals, and it reflows on resize (40×15 → large windows).
 
-EXPERIENCE and PROJECTS are pagers (browse with `↑/↓`, page counter in the
-footer). CONTACT renders **OSC 8 hyperlinks**, clickable in supporting terminals.
-The layout is responsive: it adapts from 40×15 up to large windows and reflows on
-terminal resize.
+Colours come from a **per-session lipgloss renderer** whose profile is derived
+from the client's `TERM`, so each visitor is styled for their own terminal.
 
 ## Develop
 
@@ -115,9 +119,9 @@ internal/
   session           persisted visitor stats + active-session gauge
   version           build metadata (ldflags)
   tui               the Bubble Tea application:
-    model.go        root model, Init/Update, input handling, modes
-    view.go         frame assembly (header · body · footer), menu/search/help
-    sections.go     per-section renderers (all content from resume.json)
-    theme.go        lipgloss palette (mirrors the web theme)
+    model.go        root model, Init/Update, input handling, tabs/focus
+    view.go         layout: splash · masthead · tab bar · list · detail · footer
+    content.go      tab/item model + per-item detail renderers (from resume.json)
+    theme.go        lipgloss palette built from the per-session renderer
     layout.go       wrapping, OSC 8 links, width/truncate helpers
 ```

@@ -7,211 +7,227 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// View renders the whole screen: a rounded frame with a header bar, scrollable
-// body, and a contextual footer of keyboard hints.
+// View centers a floating content block on an otherwise black screen — no
+// full-screen frame (the terminal.shop aesthetic).
 func (m Model) View() string {
 	if m.quitting {
-		return m.theme.dim.Render("\n  See you around — thanks for visiting.\n\n")
+		return m.theme.dim.Render("\n  thanks for visiting — bye.\n\n")
 	}
 	if m.mode == modeSplash || !m.ready {
 		return m.splashView()
 	}
 
-	header := m.headerBar()
-	footer := m.footerBar()
-	rule := ruleLine(m.theme, m.innerW)
-
-	body := lipgloss.NewStyle().
-		MaxWidth(m.innerW).MaxHeight(m.bodyH).
-		Render(m.bodyBlock())
-
-	inner := strings.Join([]string{header, rule, body, rule, footer}, "\n")
-	return lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(colBorder).
-		Padding(0, 1).
-		Render(inner)
-}
-
-func (m Model) splashView() string {
-	t := m.theme
-	block := lipgloss.JoinVertical(lipgloss.Center,
-		t.headerName.Render(strings.ToUpper(m.res.Name)),
-		t.dim.Render(m.res.Title),
-		"",
-		t.accent.Render("● ● ●"),
-	)
+	var block string
+	switch m.mode {
+	case modeSearch:
+		block = m.searchView()
+	case modeHelp:
+		block = m.helpView()
+	default:
+		block = m.browseView()
+	}
 	return lipgloss.Place(max(m.width, 1), max(m.height, 1),
 		lipgloss.Center, lipgloss.Center, block)
 }
 
-// bodyBlock renders the mode-specific body clamped to exactly innerW × bodyH.
-func (m Model) bodyBlock() string {
-	styleBody := lipgloss.NewStyle().
-		Width(m.innerW).Height(m.bodyH).
-		MaxWidth(m.innerW).MaxHeight(m.bodyH)
-
-	switch m.mode {
-	case modeMenu:
-		content := m.menuContent()
-		colW := lipgloss.Width(strings.SplitN(content, "\n", 2)[0])
-		pad := (m.innerW - colW) / 2
-		if pad < 0 {
-			pad = 0
-		}
-		return lipgloss.Place(m.innerW, m.bodyH, lipgloss.Left, lipgloss.Center, indentBlock(content, pad))
-	case modeSection:
-		return styleBody.Render(m.vp.View())
-	case modeSearch:
-		return styleBody.Render(m.searchContent())
-	case modeHelp:
-		return styleBody.Render(m.helpContent())
+// splashView shows a single minimal word, like terminal.shop's "terminal".
+func (m Model) splashView() string {
+	word := m.username
+	if word == "" {
+		word = "portfolio"
 	}
-	return styleBody.Render("")
+	block := m.theme.brand.Render(strings.ToLower(word))
+	return lipgloss.Place(max(m.width, 1), max(m.height, 1),
+		lipgloss.Center, lipgloss.Center, block)
 }
 
-func (m Model) menuContent() string {
+// browseView assembles masthead · tab bar · two-column body · footer.
+func (m Model) browseView() string {
 	t := m.theme
-	width := 0
-	for _, s := range m.sections {
-		if l := lipgloss.Width(s.name) + 2; l > width {
-			width = l
+	masthead := joinEnds(
+		t.brand.Render(strings.ToLower(firstWord(m.res.Name))+" "+lastInitial(m.res.Name)),
+		t.dim.Render(strings.ToLower(m.res.Title)),
+		m.contentW,
+	)
+
+	body := lipgloss.JoinHorizontal(lipgloss.Top,
+		m.leftPane(),
+		spacerCol(3, m.bodyH),
+		m.rightPane(),
+	)
+
+	footer := m.footer()
+
+	return lipgloss.JoinVertical(lipgloss.Left,
+		masthead,
+		"",
+		m.tabBar(),
+		"",
+		body,
+		"",
+		footer,
+	)
+}
+
+func (m Model) tabBar() string {
+	t := m.theme
+	// Measure the bordered version; fall back to a compact single line if it
+	// would overflow the content width (narrow terminals).
+	var cells []string
+	for i, tb := range m.tabs {
+		inner := m.tabInner(tb, i == m.tab)
+		if i == m.tab {
+			cells = append(cells, t.tabActive.Render(inner))
+		} else {
+			cells = append(cells, t.tabIdle.Render(inner))
 		}
 	}
+	bar := lipgloss.JoinHorizontal(lipgloss.Top, cells...)
+	if lipgloss.Width(bar) <= m.contentW {
+		return centerBlock(bar, m.contentW)
+	}
+	return m.compactTabBar()
+}
+
+func (m Model) tabInner(tb tabDef, active bool) string {
+	t := m.theme
+	key := t.key.Render(string(tb.key))
+	if active {
+		return key + " " + t.brand.Render(tb.label)
+	}
+	return key + " " + t.dim.Render(tb.label)
+}
+
+func (m Model) compactTabBar() string {
+	t := m.theme
+	var parts []string
+	for i, tb := range m.tabs {
+		lbl := tb.label
+		if i == m.tab {
+			parts = append(parts, t.key.Render(string(tb.key))+" "+t.brand.Render(lbl))
+		} else {
+			parts = append(parts, t.key.Render(string(tb.key))+" "+t.dim.Render(lbl))
+		}
+	}
+	line := strings.Join(parts, t.dim.Render("  "))
+	return centerBlock(truncateANSI(line, m.contentW), m.contentW)
+}
+
+// leftPane renders the grouped item list with a solid accent selection bar.
+func (m Model) leftPane() string {
+	t := m.theme
+	items := m.tabs[m.tab].items
 	var lines []string
-	for i, s := range m.sections {
-		prefix := "  "
-		style := t.menuItem
-		if i == m.menuIdx {
-			prefix = "▸ "
-			style = t.selected
+	lastGroup := ""
+	for i, it := range items {
+		if it.group != lastGroup {
+			if len(lines) > 0 {
+				lines = append(lines, "")
+			}
+			lines = append(lines, t.group.Render(truncate("~ "+it.group+" ~", m.leftW)))
+			lastGroup = it.group
 		}
-		lines = append(lines, style.Render(padRight(prefix+s.name, width)))
+		label := truncate(it.label, m.leftW-1)
+		if i == m.sel {
+			lines = append(lines, t.selBar.Render(padRight(" "+label, m.leftW)))
+		} else {
+			lines = append(lines, t.item.Render(" "+label))
+		}
 	}
-	return strings.Join(lines, "\n")
+	return lipgloss.NewStyle().Width(m.leftW).Height(m.bodyH).MaxHeight(m.bodyH).
+		Render(strings.Join(lines, "\n"))
 }
 
-func (m Model) searchContent() string {
+// rightPane renders the live detail viewport, with a focus indicator.
+func (m Model) rightPane() string {
 	t := m.theme
+	content := m.vp.View()
+	block := lipgloss.NewStyle().Width(m.rightW).Height(m.bodyH).MaxHeight(m.bodyH).Render(content)
+	// Scroll affordance when the detail overflows.
+	if m.vp.TotalLineCount() > m.bodyH {
+		hint := "▾ more"
+		if m.detailFocus {
+			hint = fmt.Sprintf("%d%%", int(m.vp.ScrollPercent()*100))
+		}
+		block = overlayBottomRight(block, t.dim.Render(hint), m.rightW)
+	}
+	return block
+}
+
+func (m Model) footer() string {
+	t := m.theme
+	rule := t.rule.Render(strings.Repeat("─", m.contentW))
+	var pairs [][2]string
+	if m.detailFocus {
+		pairs = [][2]string{{"↑/↓", "scroll"}, {"esc", "back"}, {"←/→", "tab"}, {"/", "search"}, {"q", "quit"}}
+	} else {
+		pairs = [][2]string{{"↑/↓", "browse"}, {"←/→", "tab"}, {"↵", "open"}, {"/", "search"}, {"?", "help"}, {"q", "quit"}}
+	}
+	hints := renderHints(t, pairs)
+	return rule + "\n" + centerBlock(truncateANSI(hints, m.contentW), m.contentW)
+}
+
+func (m Model) searchView() string {
+	t := m.theme
+	w := m.contentW
 	var b strings.Builder
-	b.WriteString(t.title.Render("SEARCH") + "\n")
-	b.WriteString(ruleLine(t, min(m.innerW, 48)) + "\n\n")
+	b.WriteString(t.brand.Render("search") + "\n")
+	b.WriteString(t.rule.Render(strings.Repeat("─", min(w, 48))) + "\n\n")
 	b.WriteString(m.search.View() + "\n\n")
 
 	q := strings.TrimSpace(m.search.Value())
-	if q == "" {
+	switch {
+	case q == "":
 		b.WriteString(t.dim.Render("Search across every résumé section."))
-		return b.String()
-	}
-	if len(m.results) == 0 {
+	case len(m.results) == 0:
 		b.WriteString(t.dim.Render("No results for “" + q + "”."))
-		return b.String()
-	}
-	b.WriteString(t.dim.Render(fmt.Sprintf("%d result(s)", len(m.results))) + "\n\n")
-	maxShow := m.bodyH - 8
-	if maxShow < 1 {
-		maxShow = 1
-	}
-	for i, hit := range m.results {
-		if i >= maxShow {
-			b.WriteString(t.dim.Render(fmt.Sprintf("  … %d more", len(m.results)-maxShow)))
-			break
+	default:
+		b.WriteString(t.dim.Render(fmt.Sprintf("%d result(s)", len(m.results))) + "\n\n")
+		maxShow := m.bodyH
+		for i, hit := range m.results {
+			if i >= maxShow {
+				b.WriteString(t.dim.Render(fmt.Sprintf("  … %d more", len(m.results)-maxShow)))
+				break
+			}
+			marker := "  "
+			nameStyle := t.item
+			if i == m.resIdx {
+				marker = t.accent.Render("▸ ")
+				nameStyle = t.brand
+			}
+			b.WriteString(marker + t.accent2.Render(padRight(strings.ToLower(hit.Section), 15)) +
+				nameStyle.Render(truncate(hit.Title, w-20)) + "\n")
 		}
-		marker := "  "
-		nameStyle := t.menuItem
-		if i == m.resIdx {
-			marker = t.accent.Render("▸ ")
-			nameStyle = t.selected
-		}
-		line := marker + t.accent2.Render(padRight(hit.Section, 15)) + nameStyle.Render(truncate(hit.Title, m.innerW-20))
-		b.WriteString(line + "\n")
 	}
-	return strings.TrimRight(b.String(), "\n")
+	b.WriteString("\n\n" + t.rule.Render(strings.Repeat("─", w)) + "\n")
+	b.WriteString(centerBlock(renderHints(t, [][2]string{{"↑/↓", "move"}, {"↵", "open"}, {"esc", "close"}}), w))
+	return lipgloss.NewStyle().Width(w).Render(b.String())
 }
 
-func (m Model) helpContent() string {
+func (m Model) helpView() string {
 	t := m.theme
+	w := m.contentW
 	rows := [][2]string{
-		{"↑ / ↓  k / j", "navigate menu · scroll · browse items"},
-		{"← / →  Tab", "previous / next section"},
-		{"Enter", "open selected menu item / search result"},
-		{"Esc", "back to menu"},
-		{"/", "open search"},
+		{"↑ / ↓  k / j", "browse the list · scroll the detail pane"},
+		{"← / →  Tab", "switch tab (category)"},
+		{"a e p s r c", "jump straight to a tab"},
+		{"Enter", "focus the detail pane"},
+		{"Esc", "leave the detail pane"},
+		{"/", "search every section"},
 		{"?", "toggle this help"},
 		{"q  Ctrl+C", "quit / disconnect"},
 	}
 	var b strings.Builder
-	b.WriteString(t.title.Render("KEYBOARD SHORTCUTS") + "\n")
-	b.WriteString(ruleLine(t, min(m.innerW, 48)) + "\n\n")
+	b.WriteString(t.brand.Render("keyboard") + "\n")
+	b.WriteString(t.rule.Render(strings.Repeat("─", min(w, 48))) + "\n\n")
 	for _, r := range rows {
 		b.WriteString(t.key.Render(padRight(r[0], 16)) + t.keyDesc.Render(r[1]) + "\n")
 	}
 	b.WriteString("\n" + t.dim.Render("Press Esc or ? to close."))
-	return b.String()
+	return lipgloss.NewStyle().Width(w).Render(b.String())
 }
 
-func (m Model) headerBar() string {
-	t := m.theme
-	left := t.headerName.Render(strings.ToUpper(m.res.Name))
-	right := t.headerTag.Render(m.headerRight())
-	return joinEnds(left, right, m.innerW)
-}
-
-func (m Model) headerRight() string {
-	switch m.mode {
-	case modeSection:
-		return m.sections[m.active].name
-	case modeSearch:
-		return "SEARCH"
-	case modeHelp:
-		return "HELP"
-	default:
-		return "PORTFOLIO"
-	}
-}
-
-func (m Model) footerBar() string {
-	t := m.theme
-	hints := m.footerHints()
-	left := renderHints(t, hints)
-	right := ""
-	if m.mode == modeSection {
-		sec := m.sections[m.active]
-		if sec.id == "experience" && len(m.res.Experience) > 0 {
-			right = t.dim.Render(fmt.Sprintf("%02d / %02d", m.selExp+1, len(m.res.Experience)))
-		} else if sec.id == "projects" && len(m.res.Projects) > 0 {
-			right = t.dim.Render(fmt.Sprintf("%02d / %02d", m.selProj+1, len(m.res.Projects)))
-		}
-	}
-	return joinEnds(left, right, m.innerW)
-}
-
-// footerHints returns [key, description] pairs for the current mode. On narrow
-// terminals a shorter set is used.
-func (m Model) footerHints() [][2]string {
-	narrow := m.innerW < 64
-	switch m.mode {
-	case modeMenu:
-		if narrow {
-			return [][2]string{{"↑↓", "nav"}, {"↵", "open"}, {"/", "search"}, {"q", "quit"}}
-		}
-		return [][2]string{{"↑↓", "navigate"}, {"↵", "open"}, {"/", "search"}, {"?", "help"}, {"q", "quit"}}
-	case modeSection:
-		move := "scroll"
-		if isPager(m.sections[m.active].id) {
-			move = "browse"
-		}
-		if narrow {
-			return [][2]string{{"↑↓", move}, {"←→", "section"}, {"esc", "menu"}, {"q", "quit"}}
-		}
-		return [][2]string{{"↑↓", move}, {"←→", "section"}, {"/", "search"}, {"esc", "menu"}, {"q", "quit"}}
-	case modeSearch:
-		return [][2]string{{"↑↓", "move"}, {"↵", "open"}, {"esc", "close"}}
-	case modeHelp:
-		return [][2]string{{"esc", "close"}}
-	}
-	return nil
-}
+/* -------------------------------- helpers --------------------------------- */
 
 func renderHints(t theme, pairs [][2]string) string {
 	parts := make([]string, 0, len(pairs))
@@ -225,11 +241,76 @@ func renderHints(t theme, pairs [][2]string) string {
 func joinEnds(left, right string, width int) string {
 	lw, rw := lipgloss.Width(left), lipgloss.Width(right)
 	if lw+rw+1 > width {
-		// Not enough room: keep the left side, clamp to width.
-		return lipgloss.NewStyle().MaxWidth(width).Render(left)
+		return truncateANSI(left, width)
 	}
-	gap := width - lw - rw
-	return left + strings.Repeat(" ", gap) + right
+	return left + strings.Repeat(" ", width-lw-rw) + right
+}
+
+// centerBlock horizontally centers a (possibly multi-line) block within width,
+// indenting every line by the same amount so borders stay aligned.
+func centerBlock(s string, width int) string {
+	lines := strings.Split(s, "\n")
+	max := 0
+	for _, ln := range lines {
+		if w := lipgloss.Width(ln); w > max {
+			max = w
+		}
+	}
+	if max >= width {
+		return s
+	}
+	pad := strings.Repeat(" ", (width-max)/2)
+	for i := range lines {
+		lines[i] = pad + lines[i]
+	}
+	return strings.Join(lines, "\n")
+}
+
+// spacerCol returns a blank column of the given width and height.
+func spacerCol(width, height int) string {
+	line := strings.Repeat(" ", width)
+	rows := make([]string, height)
+	for i := range rows {
+		rows[i] = line
+	}
+	return strings.Join(rows, "\n")
+}
+
+// overlayBottomRight writes label onto the last line of block, right-aligned.
+func overlayBottomRight(block, label string, width int) string {
+	lines := strings.Split(block, "\n")
+	if len(lines) == 0 {
+		return block
+	}
+	last := len(lines) - 1
+	lw := lipgloss.Width(label)
+	if lw < width {
+		lines[last] = strings.Repeat(" ", width-lw) + label
+	}
+	return strings.Join(lines, "\n")
+}
+
+func truncateANSI(s string, width int) string {
+	return lipgloss.NewStyle().MaxWidth(width).Render(s)
+}
+
+func firstWord(s string) string {
+	if i := strings.IndexByte(s, ' '); i >= 0 {
+		return s[:i]
+	}
+	return s
+}
+
+func lastInitial(s string) string {
+	fields := strings.Fields(s)
+	if len(fields) < 2 {
+		return ""
+	}
+	last := fields[len(fields)-1]
+	if last == "" {
+		return ""
+	}
+	return strings.ToLower(last[:1])
 }
 
 func max(a, b int) int {
@@ -237,18 +318,4 @@ func max(a, b int) int {
 		return a
 	}
 	return b
-}
-
-// indentBlock prepends n spaces to every line so a block can be positioned as a
-// left-aligned unit (avoiding lipgloss per-line centering).
-func indentBlock(s string, n int) string {
-	if n <= 0 {
-		return s
-	}
-	pad := strings.Repeat(" ", n)
-	lines := strings.Split(s, "\n")
-	for i := range lines {
-		lines[i] = pad + lines[i]
-	}
-	return strings.Join(lines, "\n")
 }

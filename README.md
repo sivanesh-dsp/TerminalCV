@@ -38,8 +38,11 @@ no duplicated résumé data anywhere.
 - Go + the [Charm](https://charm.sh) stack: `wish` (SSH), `bubbletea`,
   `bubbles`, `lipgloss`. Launches straight into the portfolio — **no shell**,
   no prompt, no command parser.
-- Keyboard navigation (↑↓ ←→ Enter Esc `/` `?` `q`), pager sections, splash
-  animation, OSC 8 hyperlinks, responsive layout + resize, ANSI colours.
+- A terminal.shop-style **master-detail browser**: minimal splash, a bordered
+  tab bar, a grouped list with a solid accent selection bar, and a live detail
+  pane — floating centered (not full-screen). Keyboard driven (↑↓ ←→ Enter Esc
+  `a e p s r c` `/` `?` `q`), OSC 8 hyperlinks, responsive + resize, per-session
+  colours from the client's `TERM`.
 - Anonymous access (any username, no password), visitor stats, graceful
   shutdown, health checks, structured logging — and a hard security sandbox.
 
