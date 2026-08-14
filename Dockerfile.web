@@ -1,7 +1,10 @@
 # syntax=docker/dockerfile:1
 
 # ---- build the React site ----------------------------------------------------
-FROM node:20-alpine AS build
+# Pinned to the BUILD platform: the output is static (arch-independent), so we
+# build it once natively instead of re-running the Node build under emulation
+# for every target architecture.
+FROM --platform=$BUILDPLATFORM node:20-alpine AS build
 WORKDIR /app
 
 # Install deps against the lockfile first (better layer caching).

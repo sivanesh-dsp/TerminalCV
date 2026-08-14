@@ -2,7 +2,10 @@
 
 # ---- build stage -------------------------------------------------------------
 # Build context is the REPOSITORY ROOT (so we can copy the shared résumé).
-FROM golang:1.26-alpine AS build
+# Pin the build stage to the BUILD platform and cross-compile to the TARGET
+# platform with Go's GOOS/GOARCH — this avoids slow QEMU emulation of the
+# compiler while still producing a correct per-arch binary (CGO is disabled).
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
 
 WORKDIR /src/ssh
 # Cache modules first.
@@ -14,8 +17,11 @@ COPY ssh/ ./
 
 ARG VERSION=dev
 ARG BUILD_TIME=unknown
+# Provided automatically by Buildx for the target platform.
+ARG TARGETOS
+ARG TARGETARCH
 ENV CGO_ENABLED=0
-RUN go build \
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
       -trimpath \
       -ldflags "-s -w \
         -X github.com/sivanesh/portfolio-ssh/internal/version.Version=${VERSION} \
@@ -23,6 +29,8 @@ RUN go build \
       -o /out/portfolio-ssh ./cmd/portfolio-ssh
 
 # ---- runtime stage -----------------------------------------------------------
+# No --platform here: Buildx resolves alpine for each TARGET platform, so the
+# resulting image is native to arm64 / amd64 respectively.
 FROM alpine:3.20
 
 RUN apk add --no-cache ca-certificates wget \
