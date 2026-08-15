@@ -57,10 +57,13 @@ func TestExperienceLabel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	// From 2024-08-01 to 2026-08-02 is exactly 2 years.
+	// Total professional experience = sum of employment periods (gaps excluded):
+	//   Mr.Cooper 06/2022–03/2023 = 9 mos
+	//   Cprime    08/2024–Present  = 24 mos as of 2026-08
+	// => 33 mos = 2 yrs 9 mos.
 	got := r.ExperienceLabel(time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC))
-	if got != "2 yrs 0 mos" {
-		t.Errorf("ExperienceLabel = %q, want %q", got, "2 yrs 0 mos")
+	if got != "2 yrs 9 mos" {
+		t.Errorf("ExperienceLabel = %q, want %q", got, "2 yrs 9 mos")
 	}
 	if r.Employers() != 2 {
 		t.Errorf("Employers = %d, want 2", r.Employers())
