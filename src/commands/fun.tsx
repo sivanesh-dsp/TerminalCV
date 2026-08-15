@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { resume, allTechnologies } from '@/data/resume';
-import { experienceLabel } from '@/utils/format';
+import { totalExperienceLabel } from '@/utils/format';
 import type { Command } from '@/commands/types';
 import { Accent, Accent2, Bold, Muted, Ok, Warn } from '@/components/output/ui';
 
@@ -166,7 +166,7 @@ function Neofetch() {
     ['OS', 'SivaneshOS — Cloud-Native Edition'],
     ['Host', resume.title],
     ['Kernel', 'kubernetes-1.x-cka'],
-    ['Uptime', `${experienceLabel(resume.careerStartISO)} in DevOps`],
+    ['Uptime', `${totalExperienceLabel(resume.experience)} in industry`],
     ['Shell', 'zsh (bash-compatible)'],
     ['DE', 'ArgoCD + GitOps'],
     ['WM', 'Jenkins on Kubernetes'],

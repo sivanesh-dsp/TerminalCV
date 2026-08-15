@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -144,20 +145,53 @@ func (r *Resume) AllTechnologies() []string {
 	return out
 }
 
-// ExperienceMonths returns whole months of experience since CareerStartISO.
+// ExperienceMonths returns total professional experience in whole months,
+// summed across every experience entry. Career gaps (e.g. for higher studies)
+// are naturally excluded because only actual employment periods are counted.
 func (r *Resume) ExperienceMonths(now time.Time) int {
-	start, err := time.Parse("2006-01-02", r.CareerStartISO)
-	if err != nil {
+	total := 0
+	for _, e := range r.Experience {
+		total += experienceEntryMonths(e.Start, e.End, now)
+	}
+	return total
+}
+
+// experienceEntryMonths returns whole months between a "MM/YYYY" start and end.
+// A blank/"Present" end is treated as now.
+func experienceEntryMonths(start, end string, now time.Time) int {
+	sy, sm, ok := parseMonthYear(start)
+	if !ok {
 		return 0
 	}
-	months := (now.Year()-start.Year())*12 + int(now.Month()) - int(start.Month())
-	if now.Day() < start.Day() {
-		months--
+	ey, em := now.Year(), int(now.Month())
+	if !isPresentEnd(end) {
+		if y, m, ok := parseMonthYear(end); ok {
+			ey, em = y, m
+		}
 	}
+	months := (ey-sy)*12 + (em - sm)
 	if months < 0 {
-		months = 0
+		return 0
 	}
 	return months
+}
+
+// parseMonthYear parses a "MM/YYYY" string into a year and 1-based month.
+func parseMonthYear(s string) (year, month int, ok bool) {
+	t, err := time.Parse("01/2006", strings.TrimSpace(s))
+	if err != nil {
+		return 0, 0, false
+	}
+	return t.Year(), int(t.Month()), true
+}
+
+// isPresentEnd reports whether an end date means "ongoing".
+func isPresentEnd(s string) bool {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "", "present", "current", "now", "ongoing":
+		return true
+	}
+	return false
 }
 
 // ExperienceLabel renders a human duration like "2 yrs 1 mo".

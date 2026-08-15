@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { resume, allTechnologies } from '@/data/resume';
-import { experienceLabel } from '@/utils/format';
+import { totalExperienceLabel } from '@/utils/format';
 import type { Command, CommandContext, TerminalActions } from '@/commands/types';
 import {
   Accent,
@@ -245,7 +245,7 @@ function TimelineView() {
 function StatsView() {
   const employers = new Set(resume.experience.map((e) => e.company)).size;
   const rows: [string, ReactNode][] = [
-    ['Experience', `${experienceLabel(resume.careerStartISO)} (since Aug 2024)`],
+    ['Experience', totalExperienceLabel(resume.experience)],
     ['Technologies', String(allTechnologies.length)],
     ['Certifications', String(resume.certifications.length)],
     ['Projects', String(resume.projects.length)],
