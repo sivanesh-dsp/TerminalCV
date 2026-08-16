@@ -2,6 +2,14 @@
 # DOMAIN defaults to localhost (Caddy issues a local certificate); set it to
 # your real domain in production to get a Let's Encrypt certificate.
 
+# Internal plain-HTTP health endpoint for container health checks. A bare-port
+# site is HTTP-only (no automatic-HTTPS redirect, no certificate needed), so a
+# probe to 127.0.0.1 succeeds even though the public site forces HTTPS. This
+# port is NOT published to the host.
+:2021 {
+	respond /healthz "ok" 200
+}
+
 {$DOMAIN:localhost} {
 	root * /srv
 	encode zstd gzip
