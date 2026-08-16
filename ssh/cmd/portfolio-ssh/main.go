@@ -10,8 +10,10 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -65,6 +67,19 @@ func main() {
 
 	store := session.NewStore(cfg.StatePath)
 
+	// Optional probe log: non-interactive scanner/bot connections (no PTY) are
+	// recorded here — one line per source IP — for fail2ban to act on. Kept out
+	// of the main log so it stays clean and stats aren't inflated by bots.
+	var probeLog io.Writer
+	if pl := os.Getenv("PROBE_LOG"); pl != "" {
+		if f, err := os.OpenFile(pl, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err != nil {
+			logger.Warn("could not open PROBE_LOG; probes will not be recorded", "path", pl, "err", err)
+		} else {
+			probeLog = f
+			defer f.Close()
+		}
+	}
+
 	srv, err := wish.NewServer(
 		wish.WithAddress(cfg.SSHAddr),
 		wish.WithHostKeyPath(cfg.HostKeyPath),
@@ -76,7 +91,7 @@ func main() {
 		wish.WithMiddleware(
 			bm.Middleware(teaHandler(res, cfg, store)),
 			activeterm.Middleware(), // require an interactive PTY
-			sessionMiddleware(store, logger),
+			sessionMiddleware(store, logger, probeLog),
 		),
 	)
 	if err != nil {
@@ -150,8 +165,12 @@ func colorProfile(term string) termenv.Profile {
 }
 
 // sessionMiddleware records visitor stats and structured logs around each
-// session without ever inspecting or executing session input.
-func sessionMiddleware(store *session.Store, logger *slog.Logger) wish.Middleware {
+// interactive session. Non-interactive connections (SSH scanners/bots that
+// never request a PTY) are treated as noise: they are NOT counted as visitors
+// and are kept out of the main log; when a probe log is configured, their
+// source IP is recorded there for fail2ban. It never inspects or executes
+// session input.
+func sessionMiddleware(store *session.Store, logger *slog.Logger, probeLog io.Writer) wish.Middleware {
 	return func(next ssh.Handler) ssh.Handler {
 		return func(s ssh.Session) {
 			defer func() {
@@ -159,11 +178,30 @@ func sessionMiddleware(store *session.Store, logger *slog.Logger) wish.Middlewar
 					logger.Error("session panic recovered", "err", r, "user", s.User())
 				}
 			}()
+
+			remote := s.RemoteAddr().String()
+			_, _, isPty := s.Pty()
+
+			// No PTY => an automated probe, not a real visitor. Record its IP
+			// for fail2ban (if enabled), then let activeterm reject it. Do not
+			// count it or write it to the main log.
+			if !isPty {
+				if probeLog != nil {
+					host, _, err := net.SplitHostPort(remote)
+					if err != nil {
+						host = remote
+					}
+					fmt.Fprintf(probeLog, "%s probe from %s\n",
+						time.Now().UTC().Format(time.RFC3339), host)
+				}
+				next(s)
+				return
+			}
+
 			store.IncActive()
 			defer store.DecActive()
 			store.Visit(s.User())
 
-			remote := s.RemoteAddr().String()
 			start := time.Now()
 			logger.Info("session started", "user", s.User(), "remote", remote, "active", store.Active())
 			next(s)

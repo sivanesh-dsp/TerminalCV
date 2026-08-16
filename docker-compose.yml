@@ -47,6 +47,8 @@ services:
       MAX_TIMEOUT: 60m
       # Durable log file on a host bind mount (also written to stdout).
       LOG_FILE: /var/log/portfolio/ssh.log
+      # Scanner/bot probe IPs (no PTY) are recorded here for fail2ban.
+      PROBE_LOG: /var/log/portfolio/probes.log
     ports:
       # Host ${SSH_PORT} -> container 2222. Set SSH_PORT=22 in production
       # (ensure the host's own sshd uses a different port).

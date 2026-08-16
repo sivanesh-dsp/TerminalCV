@@ -245,7 +245,41 @@ hardening. Serve the website separately with Caddy or Nginx (`deploy/Caddyfile`,
 
 ---
 
-## 9. Troubleshooting
+## 9. SSH bot noise & fail2ban
+
+Any public SSH on port 22 is constantly probed by internet scanners/bots. This
+is harmless — the server is sandboxed (no shell, no host access) — but it spams
+logs and would inflate visitor stats. Two defenses are built in:
+
+1. **App filter (automatic).** Non-interactive connections (no PTY — i.e. bots)
+   are never counted as visitors and are kept out of the main log. When
+   `PROBE_LOG` is set (the compose files set it to
+   `/var/log/portfolio/probes.log` → `./logs/ssh/probes.log` on the host), their
+   source IP is recorded there, one line per probe, for fail2ban.
+
+2. **fail2ban (opt-in).** Ban repeat-offender IPs at the host firewall:
+
+   ```bash
+   sudo apt-get install -y fail2ban
+   sudo cp deploy/fail2ban/filter.d/portfolio-ssh.conf /etc/fail2ban/filter.d/
+   sudo cp deploy/fail2ban/jail.d/portfolio-ssh.local  /etc/fail2ban/jail.d/
+   # Make sure logpath in the jail matches your repo path (default /opt/terminal-cv).
+   sudo systemctl restart fail2ban
+
+   # verify
+   sudo fail2ban-regex logs/ssh/probes.log deploy/fail2ban/filter.d/portfolio-ssh.conf
+   sudo fail2ban-client status portfolio-ssh
+   ```
+
+   The jail bans an IP that probes 10+ times in 10 minutes for 24 h. Because the
+   SSH port is **published by Docker** (traffic is FORWARDed to the container and
+   bypasses the host `INPUT` chain), the ban is applied in the **`DOCKER-USER`**
+   chain, which every published-port packet traverses. Once banned, the bot's
+   packets are dropped at the firewall, so the probe log goes quiet too.
+
+---
+
+## 10. Troubleshooting
 
 | Symptom                                   | Fix                                                                 |
 | ----------------------------------------- | ------------------------------------------------------------------- |
