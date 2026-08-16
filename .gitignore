@@ -30,3 +30,6 @@ logs
 .env.*
 !.env.example
 *.tsbuildinfo
+
+# Runtime container logs (bind-mounted on the VM)
+logs/

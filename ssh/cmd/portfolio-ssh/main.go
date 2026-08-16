@@ -35,7 +35,24 @@ import (
 )
 
 func main() {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	// Logs go to stdout (so `docker compose logs ssh` works) and, when LOG_FILE
+	// is set, are also appended to that file for durable on-disk persistence.
+	var logWriter io.Writer = os.Stdout
+	var logFile *os.File
+	if lf := os.Getenv("LOG_FILE"); lf != "" {
+		f, err := os.OpenFile(lf, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+		if err != nil {
+			slog.New(slog.NewTextHandler(os.Stdout, nil)).
+				Warn("could not open LOG_FILE; logging to stdout only", "path", lf, "err", err)
+		} else {
+			logFile = f
+			logWriter = io.MultiWriter(os.Stdout, f)
+		}
+	}
+	if logFile != nil {
+		defer logFile.Close()
+	}
+	logger := slog.New(slog.NewTextHandler(logWriter, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
 
 	cfg := config.Load()

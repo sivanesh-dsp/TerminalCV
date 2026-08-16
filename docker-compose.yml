@@ -22,6 +22,8 @@ services:
     volumes:
       - caddy_data:/data
       - caddy_config:/config
+      # Persist Caddy access logs on the VM (survives container rebuilds).
+      - ./logs/web:/var/log/caddy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/"]
@@ -30,7 +32,7 @@ services:
       retries: 3
     logging:
       driver: json-file
-      options: { max-size: "10m", max-file: "3" }
+      options: { max-size: "10m", max-file: "5" }
 
   ssh:
     build:
@@ -43,6 +45,8 @@ services:
     environment:
       IDLE_TIMEOUT: 5m
       MAX_TIMEOUT: 60m
+      # Durable log file inside the persistent /data volume (also to stdout).
+      LOG_FILE: /data/ssh.log
     ports:
       # Host ${SSH_PORT} -> container 2222. Set SSH_PORT=22 in production
       # (ensure the host's own sshd uses a different port).
@@ -57,7 +61,7 @@ services:
       retries: 3
     logging:
       driver: json-file
-      options: { max-size: "10m", max-file: "3" }
+      options: { max-size: "10m", max-file: "5" }
 
 volumes:
   caddy_data:

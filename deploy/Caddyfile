@@ -20,8 +20,15 @@
 		Referrer-Policy strict-origin-when-cross-origin
 	}
 
+	# HTTP access logs → a rolling file on a mounted host volume so they persist
+	# on the VM across container rebuilds. Caddy's own operational logs still go
+	# to stderr (visible via `docker compose logs web`).
 	log {
-		output stdout
-		format console
+		output file /var/log/caddy/access.log {
+			roll_size 10MiB
+			roll_keep 5
+			roll_keep_for 720h
+		}
+		format json
 	}
 }
