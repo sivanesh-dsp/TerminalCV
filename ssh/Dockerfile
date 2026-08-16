@@ -33,13 +33,15 @@ RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
 # resulting image is native to arm64 / amd64 respectively.
 FROM alpine:3.20
 
-RUN apk add --no-cache ca-certificates wget \
+RUN apk add --no-cache ca-certificates wget su-exec \
  && addgroup -S app && adduser -S -G app app \
- && mkdir -p /data && chown app:app /data
+ && mkdir -p /data /var/log/portfolio && chown app:app /data /var/log/portfolio
 
 COPY --from=build /out/portfolio-ssh /app/portfolio-ssh
+COPY ssh/docker-entrypoint.sh /app/docker-entrypoint.sh
 # The single shared source of truth (consumed at runtime).
 COPY shared/resume.json /app/shared/resume.json
+RUN chmod +x /app/docker-entrypoint.sh
 
 ENV RESUME_PATH=/app/shared/resume.json \
     SSH_ADDR=:2222 \
@@ -47,11 +49,12 @@ ENV RESUME_PATH=/app/shared/resume.json \
     HOST_KEY_PATH=/data/host_ed25519 \
     STATE_PATH=/data/state.json
 
-USER app
+# NOTE: no `USER app` here — the entrypoint starts as root only to fix bind-mount
+# ownership, then drops to the `app` user via su-exec before running the server.
 VOLUME ["/data"]
 EXPOSE 2222 8081
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget -qO- http://127.0.0.1:8081/healthz || exit 1
 
-ENTRYPOINT ["/app/portfolio-ssh"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

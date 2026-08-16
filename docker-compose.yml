@@ -45,14 +45,16 @@ services:
     environment:
       IDLE_TIMEOUT: 5m
       MAX_TIMEOUT: 60m
-      # Durable log file inside the persistent /data volume (also to stdout).
-      LOG_FILE: /data/ssh.log
+      # Durable log file on a host bind mount (also written to stdout).
+      LOG_FILE: /var/log/portfolio/ssh.log
     ports:
       # Host ${SSH_PORT} -> container 2222. Set SSH_PORT=22 in production
       # (ensure the host's own sshd uses a different port).
       - "${SSH_PORT:-2222}:2222"
     volumes:
       - ssh_data:/data
+      # Persist SSH server logs on the VM, next to the web logs.
+      - ./logs/ssh:/var/log/portfolio
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/healthz"]
