@@ -1,0 +1,68 @@
+# Production compose — pulls prebuilt multi-arch images from GHCR (NO on-VM build).
+#
+# Use this on the server so you never compile on a small/free-tier box. Images
+# are published by .github/workflows/docker-publish.yml on every push to main.
+#
+#   export DOMAIN=sivaneshbalaji.online SSH_PORT=22
+#   docker compose -f docker-compose.prod.yml pull        # fetch latest images
+#   docker compose -f docker-compose.prod.yml up -d        # (re)start, no build
+#   docker compose -f docker-compose.prod.yml logs -f      # view logs
+#
+# The images are also picked up automatically by `up` because pull_policy=always.
+# Override the owner/tag if needed:  GHCR_OWNER=... IMAGE_TAG=v1.2.3
+#
+# Web:  https://${DOMAIN}
+# SSH:  ssh ${DOMAIN}   (host port ${SSH_PORT}) — any username is accepted
+
+services:
+  web:
+    image: ghcr.io/${GHCR_OWNER:-sivanesh-dsp}/portfolio-web:${IMAGE_TAG:-latest}
+    pull_policy: always
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+      # Persist Caddy access logs on the VM (survives container replacement).
+      - ./logs/web:/var/log/caddy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  ssh:
+    image: ghcr.io/${GHCR_OWNER:-sivanesh-dsp}/portfolio-ssh:${IMAGE_TAG:-latest}
+    pull_policy: always
+    environment:
+      IDLE_TIMEOUT: 5m
+      MAX_TIMEOUT: 60m
+      # Durable log file inside the persistent /data volume (also to stdout).
+      LOG_FILE: /data/ssh.log
+    ports:
+      # Host ${SSH_PORT} -> container 2222. Set SSH_PORT=22 in production
+      # (ensure the host's own sshd uses a different port).
+      - "${SSH_PORT:-2222}:2222"
+    volumes:
+      - ssh_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+volumes:
+  caddy_data:
+  caddy_config:
+  ssh_data:

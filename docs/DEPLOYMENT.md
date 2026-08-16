@@ -145,6 +145,27 @@ That's it. Caddy fetches a Let's Encrypt certificate automatically.
 - Website: `https://mydomain.dev`
 - SSH: `ssh mydomain.dev`
 
+### Faster: pull prebuilt images instead of building on the VM
+
+Building the React + Go images on a small/free-tier box is slow and RAM-hungry.
+CI publishes **multi-arch** images (amd64 + arm64) to GHCR on every push to
+`main` (`.github/workflows/docker-publish.yml`), so on the server you can just
+**pull** — no compiler, no source build:
+
+```bash
+export DOMAIN=mydomain.dev SSH_PORT=22
+docker compose -f docker-compose.prod.yml pull     # fetch latest images
+docker compose -f docker-compose.prod.yml up -d    # (re)start, never builds
+```
+
+`docker-compose.prod.yml` references `ghcr.io/<owner>/portfolio-web` and
+`portfolio-ssh` directly (override with `GHCR_OWNER` / `IMAGE_TAG`). It keeps the
+same ports, volumes, health checks and log persistence as the build file. To
+redeploy after a new push: `pull` again, then `up -d`.
+
+> If the packages are private, `docker login ghcr.io -u <user>` first (PAT with
+> `read:packages`); if public, no login is needed.
+
 ### What runs
 
 | Service | Image               | Ports         | Volume                          |
