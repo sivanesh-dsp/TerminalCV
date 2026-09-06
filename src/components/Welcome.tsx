@@ -59,6 +59,16 @@ export function Welcome({ onRun }: { onRun?: (c: string) => void }) {
           <span className="text-term-accent2">Ctrl+L</span> clear ·{' '}
           <span className="text-term-accent2">Ctrl+K</span> palette
         </div>
+
+        {resume.sshHost && (
+          <div className="mt-3 text-sm text-term-dim">
+            Psst — this portfolio also runs over SSH:{' '}
+            <code className="text-term-accent">ssh {resume.sshHost}</code>{' '}
+            <span className="text-term-dim">
+              (type <span className="text-term-accent">ssh</span> for details)
+            </span>
+          </div>
+        )}
       </motion.div>
     </div>
   );

@@ -7,6 +7,7 @@ import {
   Accent2,
   Bullet,
   Bold,
+  CopyButton,
   Dashes,
   Ext,
   Field,
@@ -296,9 +297,60 @@ function ContactView() {
             <Ext href={c.github.url}>{c.github.url}</Ext>
           </KV>
         )}
+        {resume.sshHost && (
+          <KV label="ssh" width={11}>
+            <span className="text-term-accent">ssh {resume.sshHost}</span>
+          </KV>
+        )}
       </div>
       <div className="mt-2 text-term-dim">
-        Tip: <Accent>email</Accent>, <Accent>linkedin</Accent> open the relevant channel.
+        Tip: <Accent>email</Accent>, <Accent>linkedin</Accent> open the relevant channel.{' '}
+        <Accent>ssh</Accent> shows how to browse this résumé from your terminal.
+      </div>
+    </div>
+  );
+}
+
+/** Tells visitors this portfolio is also reachable over real SSH. */
+function SshView() {
+  const host = resume.sshHost;
+  if (!host) {
+    return <Warn>No SSH host is configured for this portfolio.</Warn>;
+  }
+  const cmd = `ssh ${host}`;
+  return (
+    <div>
+      <Heading title="ssh" />
+      <div className="text-term-fg">
+        This portfolio also runs as a real <Bold>SSH server</Bold> — the same résumé,
+        rendered natively in your terminal. No browser required.
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <code className="rounded-md border border-term-accent/40 bg-term-accent/10 px-3 py-1.5 text-term-accent">
+          {cmd}
+        </code>
+        <CopyButton text={cmd} label="copy command" />
+      </div>
+
+      <div className="mt-3 space-y-1">
+        <Bullet>
+          <Muted>No account, no password —</Muted> any username works.
+        </Bullet>
+        <Bullet>
+          <Muted>Keyboard driven:</Muted> <Accent2>↑↓</Accent2> browse ·{' '}
+          <Accent2>←→</Accent2> switch tab · <Accent2>/</Accent2> search ·{' '}
+          <Accent2>q</Accent2> quit
+        </Bullet>
+        <Bullet>
+          <Muted>Works with any SSH client</Muted> — Terminal, iTerm2, Ghostty, Windows
+          Terminal, Linux.
+        </Bullet>
+      </div>
+
+      <div className="mt-3 text-term-dim">
+        Same data, two front-ends: this web terminal and the SSH one both read one
+        résumé file.
       </div>
     </div>
   );
@@ -435,6 +487,13 @@ export const infoCommands: Command[] = [
           </div>
         </div>
       ),
+  },
+  {
+    name: 'ssh',
+    aliases: ['terminal'],
+    description: 'Open this portfolio over SSH — no browser needed',
+    category: 'social',
+    run: () => <SshView />,
   },
   {
     name: 'blog',

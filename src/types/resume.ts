@@ -85,4 +85,6 @@ export interface ResumeData {
   careerStartISO: string;
   /** Path (relative to the site base) to the downloadable PDF. */
   resumeFile: string;
+  /** Hostname the SSH portfolio is reachable at, e.g. `ssh <sshHost>`. */
+  sshHost?: string;
 }
