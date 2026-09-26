@@ -196,5 +196,10 @@
   ],
   "careerStartISO": "2024-08-01",
   "resumeFile": "Sivanesh_B_Platform_DevOps_Engineer_Resume.pdf",
-  "sshHost": "sivaneshbalaji.online"
+  "sshHost": "sivaneshbalaji.online",
+  "sshHostKey": {
+    "type": "ed25519",
+    "fingerprint": "SHA256:HHhnY/Alq+7Qc87jyg8JNryU/AsBWhnSnaM1eUpCGRo",
+    "publicKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHaeg132Hvp6DO5LhiYywxBOpqtyy3G+8FCzdA6rDxAQ"
+  }
 }

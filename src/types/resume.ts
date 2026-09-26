@@ -64,6 +64,16 @@ export interface TimelineEvent {
   subtitle?: string;
 }
 
+/** Published SSH host key, used to verify the server on first connect. */
+export interface SshHostKey {
+  /** Key algorithm, e.g. `ed25519`. */
+  type: string;
+  /** `ssh-keygen -lf` style fingerprint, e.g. `SHA256:...`. */
+  fingerprint: string;
+  /** Full `known_hosts` key material, e.g. `ssh-ed25519 AAAA...`. */
+  publicKey: string;
+}
+
 export interface ResumeData {
   name: string;
   title: string;
@@ -87,4 +97,9 @@ export interface ResumeData {
   resumeFile: string;
   /** Hostname the SSH portfolio is reachable at, e.g. `ssh <sshHost>`. */
   sshHost?: string;
+  /**
+   * Public host key of the SSH portfolio, published so visitors can verify the
+   * fingerprint they are shown on first connect (or pre-seed `known_hosts`).
+   */
+  sshHostKey?: SshHostKey;
 }

@@ -311,6 +311,67 @@ function ContactView() {
   );
 }
 
+/** A copyable, terminal-looking command box. */
+function CodeBox({ text, label = 'copy' }: { text: string; label?: string }) {
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-3">
+      <code className="break-all rounded-md border border-term-accent/40 bg-term-accent/10 px-3 py-1.5 text-term-accent">
+        {text}
+      </code>
+      <CopyButton text={text} label={label} />
+    </div>
+  );
+}
+
+/** Explains the first-connect host key prompt and publishes the fingerprint. */
+function HostKeyNotice({ host }: { host: string }) {
+  const key = resume.sshHostKey;
+  if (!key) return null;
+
+  const knownHostsLine = `${host} ${key.publicKey}`;
+  const oneLiner = `ssh-keyscan -t ${key.type} ${host} >> ~/.ssh/known_hosts`;
+
+  return (
+    <div className="mt-4">
+      <div className="text-term-accent2">First connect — host key check</div>
+      <div className="mt-1 text-term-fg">
+        SSH will ask you to trust this server the first time. That prompt is{' '}
+        <Bold>expected</Bold>, not an error:
+      </div>
+
+      <pre className="mt-2 overflow-x-auto rounded-md border border-term-dim/30 bg-black/30 px-3 py-2 text-xs leading-relaxed text-term-dim">
+        {`The authenticity of host '${host}' can't be established.
+${key.type.toUpperCase()} key fingerprint is SHA256:...
+Are you sure you want to continue connecting (yes/no/[fingerprint])?`}
+      </pre>
+
+      <div className="mt-2 text-term-fg">
+        Check that the fingerprint it shows matches this one, then type{' '}
+        <Accent>yes</Accent> — your client saves it to{' '}
+        <Accent2>~/.ssh/known_hosts</Accent2> and never asks again.
+      </div>
+      <CodeBox text={key.fingerprint} label="copy fingerprint" />
+
+      <div className="mt-3 text-term-dim">
+        Prefer to skip the prompt? Pin the key up front (paste the whole line into{' '}
+        <Accent2>~/.ssh/known_hosts</Accent2>):
+      </div>
+      <CodeBox text={knownHostsLine} label="copy known_hosts line" />
+
+      <div className="mt-3 text-term-dim">
+        Or fetch it yourself and compare — this is the safer habit:
+      </div>
+      <CodeBox text={oneLiner} label="copy keyscan" />
+
+      <div className="mt-3 text-xs text-term-dim">
+        Seeing a <Accent>WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED</Accent>{' '}
+        instead? An old entry for this host or IP is cached — remove it with{' '}
+        <Accent2>ssh-keygen -R {host}</Accent2> and reconnect.
+      </div>
+    </div>
+  );
+}
+
 /** Tells visitors this portfolio is also reachable over real SSH. */
 function SshView() {
   const host = resume.sshHost;
@@ -326,12 +387,7 @@ function SshView() {
         rendered natively in your terminal. No browser required.
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-3">
-        <code className="rounded-md border border-term-accent/40 bg-term-accent/10 px-3 py-1.5 text-term-accent">
-          {cmd}
-        </code>
-        <CopyButton text={cmd} label="copy command" />
-      </div>
+      <CodeBox text={cmd} label="copy command" />
 
       <div className="mt-3 space-y-1">
         <Bullet>
@@ -348,7 +404,9 @@ function SshView() {
         </Bullet>
       </div>
 
-      <div className="mt-3 text-term-dim">
+      <HostKeyNotice host={host} />
+
+      <div className="mt-4 text-term-dim">
         Same data, two front-ends: this web terminal and the SSH one both read one
         résumé file.
       </div>
