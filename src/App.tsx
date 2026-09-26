@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { resume } from '@/data/resume';
+import { hydrateFromApi, resume } from '@/data/resume';
 import { useTheme } from '@/hooks/useTheme';
 import { TopBar } from '@/components/TopBar';
 import { Terminal, type TerminalHandle } from '@/components/Terminal';
@@ -16,7 +16,21 @@ export default function App() {
   const [matrixActive, setMatrixActive] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
+  // Bumped when the REST API returns fresher résumé data than the bundle.
+  const [, setDataRevision] = useState(0);
   const terminalRef = useRef<TerminalHandle>(null);
+
+  // Hydrate from https://<domain>/api/v1/* in the background. The bundled
+  // shared/resume.json remains the fallback, so this can never break the site.
+  useEffect(() => {
+    let cancelled = false;
+    void hydrateFromApi().then((changed) => {
+      if (changed && !cancelled) setDataRevision((r) => r + 1);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const dismissSplash = useCallback(() => {
     setShowSplash(false);

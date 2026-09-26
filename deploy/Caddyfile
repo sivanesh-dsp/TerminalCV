@@ -11,21 +11,46 @@
 }
 
 {$DOMAIN:localhost} {
-	root * /srv
 	encode zstd gzip
 
-	# SPA-style fallback: unknown paths serve index.html; real files (incl. the
-	# résumé PDF) are served directly.
-	try_files {path} /index.html
-	file_server
+	# ---------------------------------------------------------------------
+	# REST API — https://<domain>/api/v1/*  (résumé API, FastAPI container).
+	# `handle` (not `handle_path`) keeps the /api prefix, because the service
+	# owns /api/v1, /api/docs, /api/redoc and /api/openapi.json.
+	# The API container is never published to the host: only Caddy reaches it.
+	# ---------------------------------------------------------------------
+	handle /api/* {
+		reverse_proxy api:8000 {
+			header_up X-Real-IP {remote_host}
+			transport http {
+				dial_timeout 2s
+				response_header_timeout 10s
+			}
+		}
+	}
 
-	# Long-cache the content-hashed assets, short-cache everything else.
-	@assets path /assets/*
-	header @assets Cache-Control "public, max-age=31536000, immutable"
-	header {
-		Cache-Control "public, max-age=3600"
-		X-Content-Type-Options nosniff
-		Referrer-Policy strict-origin-when-cross-origin
+	# Friendly alias: /api -> /api/v1
+	redir /api /api/v1 permanent
+
+	# ---------------------------------------------------------------------
+	# Static React site — everything else.
+	# ---------------------------------------------------------------------
+	handle {
+		root * /srv
+
+		# SPA-style fallback: unknown paths serve index.html; real files (incl.
+		# the résumé PDF) are served directly.
+		try_files {path} /index.html
+		file_server
+
+		# Long-cache the content-hashed assets, short-cache everything else.
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		header {
+			Cache-Control "public, max-age=3600"
+			X-Content-Type-Options nosniff
+			Referrer-Policy strict-origin-when-cross-origin
+		}
 	}
 
 	# HTTP access logs → a rolling file on a mounted host volume so they persist

@@ -168,13 +168,36 @@ redeploy after a new push: `pull` again, then `up -d`.
 
 ### What runs
 
-| Service | Image               | Ports         | Volume                          |
-| ------- | ------------------- | ------------- | ------------------------------- |
-| `web`   | `portfolio-web`     | 80, 443       | `caddy_data` (TLS certificates) |
-| `ssh`   | `portfolio-ssh`     | `${SSH_PORT}` | `ssh_data` (host key + stats)   |
+| Service | Image           | Ports              | Volume / mount                       |
+| ------- | --------------- | ------------------ | ------------------------------------ |
+| `web`   | `portfolio-web` | 80, 443            | `caddy_data` (TLS certificates)      |
+| `ssh`   | `portfolio-ssh` | `${SSH_PORT}`      | `ssh_data` (host key + stats)        |
+| `api`   | `resume-api`    | *(none — internal)* | `shared/resume.json` (read-only)     |
 
 The SSH **host key** and **visitor stats** persist in the `ssh_data` volume, so
 clients don't get host-key-changed warnings across restarts.
+
+Caddy routes traffic to all three:
+
+```text
+Internet
+   │
+   ▼
+Caddy (web container)
+   ├── /              → static React site
+   ├── /api/*         → api container :8000   (never published to the host)
+   └── SSH :22        → ssh container :2222
+```
+
+The API container mounts `shared/resume.json` **read-only** — it keeps no copy,
+so this repository remains the single source of truth. Verify it after deploying:
+
+```bash
+curl -s https://$DOMAIN/api/v1/health | jq
+curl -s https://$DOMAIN/api/v1/profile | jq
+curl -s "https://$DOMAIN/api/v1/search?q=kubernetes" | jq
+open https://$DOMAIN/api/docs
+```
 
 ### Operate
 
@@ -199,9 +222,31 @@ $EDITOR shared/resume.json
 docker compose up -d --build       # rebuilds web bundle; SSH picks up the file
 ```
 
+How each surface picks up the change:
+
+| Surface | Picks up the change |
+| --- | --- |
+| **API** | immediately — the file is re-read when its mtime changes (`DATA_HOT_RELOAD=true`) |
+| **Website** | on the next build **or** immediately in the browser, because the page hydrates from `/api/v1/*` |
+| **SSH** | on container restart (`docker compose restart ssh`) |
+
 > To update the SSH content **without** rebuilding, mount the file live by adding
 > to the `ssh` service in `docker-compose.yml`:
 > `volumes: ["./shared/resume.json:/app/shared/resume.json:ro"]`.
+
+### Deploying the API
+
+The API image is built and published from the sibling `resume-api` repository
+(`ghcr.io/<owner>/resume-api:latest`). On the VM:
+
+```bash
+docker compose -f docker-compose.prod.yml pull api
+docker compose -f docker-compose.prod.yml up -d api
+docker compose -f docker-compose.prod.yml logs -f api
+```
+
+Roll back with `API_IMAGE_TAG=sha-abc1234 docker compose -f docker-compose.prod.yml up -d api`.
+Full details: `../resume-api/docs/DEPLOYMENT.md`.
 
 ---
 

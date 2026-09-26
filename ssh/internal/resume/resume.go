@@ -62,6 +62,10 @@ type TimelineEvent struct {
 	Date     string `json:"date"`
 	Title    string `json:"title"`
 	Subtitle string `json:"subtitle,omitempty"`
+	// Optional semantic category ("experience" | "education" | "certification"
+	// | "milestone"). Consumed by the REST API's /api/v1/timeline endpoint,
+	// which otherwise infers it. Ignored by this TUI.
+	Type string `json:"type,omitempty"`
 }
 
 // Resume mirrors shared/resume.json field-for-field.

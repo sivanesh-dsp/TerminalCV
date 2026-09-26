@@ -62,6 +62,12 @@ export interface TimelineEvent {
   date: string;
   title: string;
   subtitle?: string;
+  /**
+   * Optional semantic category consumed by the REST API's /api/v1/timeline
+   * endpoint ("experience" | "education" | "certification" | "milestone").
+   * When omitted the API infers it. Unused by the website itself.
+   */
+  type?: string;
 }
 
 /** Published SSH host key, used to verify the server on first connect. */

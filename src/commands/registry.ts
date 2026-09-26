@@ -1,5 +1,6 @@
 import type { Command, CommandRegistry } from '@/commands/types';
 import { infoCommands, resumeCommand } from '@/commands/info';
+import { apiCommands } from '@/commands/api';
 import { systemCommands, LS_ENTRIES } from '@/commands/system';
 import { funCommands } from '@/commands/fun';
 
@@ -7,6 +8,7 @@ import { funCommands } from '@/commands/fun';
 const ALL: Command[] = [
   resumeCommand,
   ...infoCommands,
+  ...apiCommands,
   ...systemCommands,
   ...funCommands,
 ];

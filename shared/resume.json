@@ -191,7 +191,8 @@
     {
       "date": "Present",
       "title": "Platform & DevOps Engineer",
-      "subtitle": "CKA & HashiCorp Terraform Associate certified"
+      "subtitle": "CKA & HashiCorp Terraform Associate certified",
+      "type": "milestone"
     }
   ],
   "careerStartISO": "2024-08-01",

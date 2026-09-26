@@ -13,11 +13,14 @@
 #
 # Web:  https://${DOMAIN}
 # SSH:  ssh ${DOMAIN}   (host port ${SSH_PORT}) — any username is accepted
+# API:  https://${DOMAIN}/api/v1  ·  docs at /api/docs
 
 services:
   web:
     image: ghcr.io/${GHCR_OWNER:-sivanesh-dsp}/portfolio-web:${IMAGE_TAG:-latest}
     pull_policy: always
+    depends_on:
+      - api
     environment:
       DOMAIN: ${DOMAIN:-localhost}
     ports:
@@ -44,6 +47,9 @@ services:
     environment:
       IDLE_TIMEOUT: 5m
       MAX_TIMEOUT: 60m
+      # Advertised in the SSH `Contact` tab; the SSH server reads the shared
+      # résumé file directly (same source of truth, no HTTP hop).
+      RESUME_API_URL: ${RESUME_API_URL:-https://${DOMAIN:-sivaneshbalaji.online}/api/v1}
       # Durable log file on a host bind mount (also written to stdout).
       LOG_FILE: /var/log/portfolio/ssh.log
       # Scanner/bot probe IPs (no PTY) are recorded here for fail2ban.
@@ -62,6 +68,54 @@ services:
       interval: 30s
       timeout: 3s
       retries: 3
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  # ---------------------------------------------------------------------------
+  # Résumé REST API (https://<domain>/api/v1) — prebuilt image from GHCR.
+  # The shared résumé JSON is mounted READ-ONLY straight from this checkout, so
+  # the image never contains a copy and this repo stays the source of truth.
+  # ---------------------------------------------------------------------------
+  api:
+    image: ghcr.io/${GHCR_OWNER:-sivanesh-dsp}/resume-api:${API_IMAGE_TAG:-latest}
+    pull_policy: always
+    environment:
+      ENVIRONMENT: production
+      LOG_FORMAT: json
+      LOG_LEVEL: ${API_LOG_LEVEL:-INFO}
+      RESUME_PATH: /data/resume.json
+      RESUME_PDF_PATH: /data/resume.pdf
+      SITE_URL: https://${DOMAIN:-sivaneshbalaji.online}
+      CORS_ALLOW_ORIGINS: ${API_CORS_ALLOW_ORIGINS:-https://${DOMAIN:-sivaneshbalaji.online}}
+      METRICS_ENABLED: ${API_METRICS_ENABLED:-true}
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_REQUESTS: ${API_RATE_LIMIT_REQUESTS:-120}
+      TRUST_PROXY_HEADERS: "true"
+    volumes:
+      - ./shared/resume.json:/data/resume.json:ro
+      - ./public/Sivanesh_B_Platform_DevOps_Engineer_Resume.pdf:/data/resume.pdf:ro
+    # No published ports: reachable only through the Caddy reverse proxy.
+    expose:
+      - "8000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=2).status == 200 else 1)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "5" }
