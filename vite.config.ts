@@ -14,6 +14,17 @@ export default defineConfig({
       '@shared': fileURLToPath(new URL('./shared', import.meta.url)),
     },
   },
+  server: {
+    // In development the site hydrates from the résumé API running separately
+    // (see ../resume-api: `make dev`). In production Caddy proxies /api/* to the
+    // same container network, so the site always calls a same-origin URL.
+    proxy: {
+      '/api': {
+        target: process.env.VITE_API_PROXY_TARGET || 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+    },
+  },
   build: {
     target: 'es2020',
     cssMinify: true,

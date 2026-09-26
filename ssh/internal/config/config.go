@@ -13,6 +13,7 @@ type Config struct {
 	HostKeyPath string        // path to the persisted ed25519 host key
 	ResumePath  string        // explicit path to shared/resume.json ("" = auto-discover)
 	StatePath   string        // path to the persisted visitor-state JSON
+	APIURL      string        // public résumé REST API, advertised in the Contact tab
 	IdleTimeout time.Duration // disconnect idle sessions after this
 	MaxTimeout  time.Duration // hard cap on session length
 }
@@ -34,6 +35,10 @@ func envDur(key string, def time.Duration) time.Duration {
 }
 
 // Load reads configuration from the environment.
+//
+// Note on the REST API: the SSH server reads shared/resume.json directly — the
+// same file the API serves — so it needs no HTTP calls to stay in sync. APIURL
+// is only advertised to visitors who want to consume the résumé programmatically.
 func Load() Config {
 	return Config{
 		SSHAddr:     env("SSH_ADDR", ":2222"),
@@ -41,6 +46,7 @@ func Load() Config {
 		HostKeyPath: env("HOST_KEY_PATH", "data/host_ed25519"),
 		ResumePath:  env("RESUME_PATH", ""),
 		StatePath:   env("STATE_PATH", "data/state.json"),
+		APIURL:      env("RESUME_API_URL", ""),
 		IdleTimeout: envDur("IDLE_TIMEOUT", 5*time.Minute),
 		MaxTimeout:  envDur("MAX_TIMEOUT", 60*time.Minute),
 	}

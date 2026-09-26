@@ -103,6 +103,9 @@ func (m *Model) buildTabs() []tabDef {
 	}
 	addField("Phone", c.Phone)
 	addField("Location", c.Location)
+	// The public REST API over this same résumé data (resume-api). Shown only
+	// when the deployment advertises one.
+	addField("REST API", strings.TrimSpace(m.cfg.APIURL))
 	tabs = append(tabs, tabDef{id: "contact", label: "Contact", key: 'c', items: contact})
 
 	return tabs
