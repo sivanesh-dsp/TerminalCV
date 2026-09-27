@@ -14,6 +14,7 @@
 # Web:  https://${DOMAIN}
 # SSH:  ssh ${DOMAIN}   (host port ${SSH_PORT}) — any username is accepted
 # API:  https://${DOMAIN}/api/v1  ·  docs at /api/docs
+# MCP:  https://${DOMAIN}/mcp    (Streamable HTTP, for ChatGPT/Claude/agents)
 
 services:
   web:
@@ -112,6 +113,58 @@ services:
         - python
         - -c
         - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=2).status == 200 else 1)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  # ---------------------------------------------------------------------------
+  # Résumé MCP server (https://<domain>/mcp) — prebuilt image from GHCR. It
+  # holds no résumé data itself; it only calls the `api` service above over
+  # the internal Docker network. There is nothing to mount.
+  # ---------------------------------------------------------------------------
+  mcp:
+    image: ghcr.io/${GHCR_OWNER:-sivanesh-dsp}/resume-mcp:${MCP_IMAGE_TAG:-latest}
+    pull_policy: always
+    depends_on:
+      - api
+    environment:
+      ENVIRONMENT: production
+      LOG_FORMAT: json
+      LOG_LEVEL: ${MCP_LOG_LEVEL:-INFO}
+      # Internal Docker network URL — never the public one, and never an
+      # address a request could redirect elsewhere.
+      RESUME_API_URL: http://api:8000/api/v1
+      SITE_URL: https://${DOMAIN:-sivaneshbalaji.online}
+      METRICS_ENABLED: ${MCP_METRICS_ENABLED:-true}
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_REQUESTS: ${MCP_RATE_LIMIT_REQUESTS:-120}
+      TRUST_PROXY_HEADERS: "true"
+      # Must match the public hostname the MCP endpoint is actually reached
+      # at, or Streamable HTTP's DNS-rebinding protection rejects everything
+      # with 421 (see resume-mcp's docs/ARCHITECTURE.md).
+      TRANSPORT_ALLOWED_HOSTS: ${DOMAIN:-sivaneshbalaji.online},${DOMAIN:-sivaneshbalaji.online}:*
+      TRANSPORT_ALLOWED_ORIGINS: https://${DOMAIN:-sivaneshbalaji.online}
+    # No published ports: reachable only through the Caddy reverse proxy.
+    expose:
+      - "8001"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8001/healthz', timeout=2).status == 200 else 1)"
       interval: 30s
       timeout: 5s
       retries: 3

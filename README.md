@@ -75,8 +75,7 @@ There is no duplicated résumé data anywhere.
                                       │ REST (versioned, typed, read-only)
                                       ▼
                               ┌───────────────┐
-                              │  Future MCP   │──► ChatGPT · Claude · agents
-                              │    server     │
+                              │   MCP server  │──► ChatGPT · Claude · agents
                               └───────────────┘
 ```
 
@@ -97,6 +96,7 @@ terminal-resume/
 └── .github/workflows/      ← CI (lint/test/build) + Docker publish + Pages
 
 ../resume-api/              ← the REST API service (separate repository)
+../resume-mcp/              ← the MCP server for AI agents (separate repository)
 ```
 
 **No duplicated data:** the website bundles `shared/resume.json` at build time
@@ -160,11 +160,14 @@ live API status.
 ```bash
 cp .env.example .env       # set DOMAIN, SSH_PORT
 docker compose up -d --build
-# web: https://${DOMAIN}   ·   ssh sivanesh@${DOMAIN}   ·   API: https://${DOMAIN}/api/v1
+# web: https://${DOMAIN}   ·   ssh sivanesh@${DOMAIN}   ·   API: https://${DOMAIN}/api/v1   ·   MCP: https://${DOMAIN}/mcp
 ```
 
-Caddy routes `/api/*` to the API container; the API is never published to the
-host. The compose file mounts `shared/resume.json` into it read-only.
+Caddy routes `/api/*` to the API container and `/mcp*` to the MCP server
+(built from the sibling [`resume-mcp`](../resume-mcp) repository, for
+ChatGPT/Claude/agents); neither is ever published to the host. The compose
+file mounts `shared/resume.json` read-only into the API container only — the
+MCP server holds no résumé data of its own, it only calls the API.
 
 ---
 

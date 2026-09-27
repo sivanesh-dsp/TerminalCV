@@ -1,4 +1,5 @@
-# Portfolio: React website (Caddy, auto-HTTPS) + interactive SSH server + REST API.
+# Portfolio: React website (Caddy, auto-HTTPS) + interactive SSH server + REST
+# API + MCP server.
 #
 #   cp .env.example .env      # then edit DOMAIN etc.
 #   docker compose up -d --build
@@ -6,8 +7,11 @@
 # Web:  https://${DOMAIN}
 # SSH:  ssh ${DOMAIN}   (host port ${SSH_PORT}) — any username is accepted
 # API:  https://${DOMAIN}/api/v1  ·  docs at /api/docs
+# MCP:  https://${DOMAIN}/mcp    (Streamable HTTP, for ChatGPT/Claude/agents)
 #
-# All three read the SAME shared/resume.json — there is no duplicated data.
+# The website, the SSH terminal and the API all read the SAME
+# shared/resume.json — there is no duplicated data. The MCP server holds no
+# résumé data at all; it only calls the API above.
 
 services:
   web:
@@ -117,6 +121,58 @@ services:
         - python
         - -c
         - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=2).status == 200 else 1)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  # ---------------------------------------------------------------------------
+  # Résumé MCP server (https://<domain>/mcp) — built from the sibling
+  # `resume-mcp` repository. It holds no résumé data itself; it only calls
+  # the `api` service above over the internal Docker network.
+  # ---------------------------------------------------------------------------
+  mcp:
+    build:
+      context: ${RESUME_MCP_CONTEXT:-../resume-mcp}
+      dockerfile: Dockerfile
+    image: resume-mcp:latest
+    depends_on:
+      - api
+    environment:
+      ENVIRONMENT: ${MCP_ENVIRONMENT:-production}
+      LOG_FORMAT: json
+      LOG_LEVEL: ${MCP_LOG_LEVEL:-INFO}
+      # Internal Docker network URL — never the public one.
+      RESUME_API_URL: http://api:8000/api/v1
+      SITE_URL: https://${DOMAIN:-localhost}
+      METRICS_ENABLED: ${MCP_METRICS_ENABLED:-true}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      RATE_LIMIT_REQUESTS: ${MCP_RATE_LIMIT_REQUESTS:-120}
+      TRUST_PROXY_HEADERS: "true"
+      # Must match the Host header Caddy forwards for /mcp*, derived from
+      # DOMAIN below — override explicitly if the two ever diverge.
+      TRANSPORT_ALLOWED_HOSTS: ${DOMAIN:-localhost},${DOMAIN:-localhost}:*
+      TRANSPORT_ALLOWED_ORIGINS: https://${DOMAIN:-localhost}
+    # No published ports: only reachable through the Caddy proxy.
+    expose:
+      - "8001"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8001/healthz', timeout=2).status == 200 else 1)"
       interval: 30s
       timeout: 5s
       retries: 3

@@ -33,6 +33,34 @@
 	redir /api /api/v1 permanent
 
 	# ---------------------------------------------------------------------
+	# MCP server — https://<domain>/mcp  (résumé MCP server, Streamable HTTP).
+	# `handle` (not `handle_path`) keeps the /mcp prefix. Streamable HTTP can
+	# hold a POST's response open (an SSE stream) far longer than a typical
+	# API call, and a client can also open a long-lived GET stream — both
+	# need a generous response timeout and unbuffered flushing.
+	# The MCP container is never published to the host: only Caddy reaches it.
+	# ---------------------------------------------------------------------
+	handle /mcp* {
+		reverse_proxy mcp:8001 {
+			header_up X-Real-IP {remote_host}
+			flush_interval -1
+			transport http {
+				dial_timeout 2s
+				response_header_timeout 15s
+			}
+		}
+
+		# The MCP server sets its own no-store policy; do not let the
+		# static-site cache rules apply.
+		header -Cache-Control
+	}
+
+	# /healthz, /readyz and /metrics (both the API's and the MCP server's)
+	# stay private — never proxied publicly. Reach them over the Docker
+	# network or an SSH tunnel, e.g.:
+	#   ssh -L 8001:mcp:8001 <vm> && curl localhost:8001/readyz
+
+	# ---------------------------------------------------------------------
 	# Static React site — everything else.
 	# ---------------------------------------------------------------------
 	handle {
